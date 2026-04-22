@@ -19,6 +19,7 @@ export function FileList(): JSX.Element {
   const selectedIndex = useExplorerStore((s) => s.selectedIndex);
   const setSelectedIndex = useExplorerStore((s) => s.setSelectedIndex);
   const navigate = useExplorerStore((s) => s.navigate);
+  const openEntry = useExplorerStore((s) => s.openEntry);
   const loading = useExplorerStore((s) => s.loading);
   const currentPath = useExplorerStore((s) => s.currentPath);
 
@@ -32,8 +33,10 @@ export function FileList(): JSX.Element {
   function onRowActivate(entry: Entry): void {
     if (entry.type === "directory") {
       void navigate(entry.path);
+      return;
     }
-    // files: no-op for Phase 1
+    // Phase 2.1: files open via OS default handler.
+    void openEntry(entry.path);
   }
 
   if (loading && entries.length === 0) {

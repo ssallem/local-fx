@@ -1,7 +1,21 @@
 import { create } from "zustand";
-import type { Drive, Entry, ReaddirArgs } from "../../types/shared";
-import { listDrives, readdir, IpcError } from "../ipc";
-import { parentPath } from "../utils/format";
+import type {
+  Drive,
+  Entry,
+  ReaddirArgs,
+  RemoveMode
+} from "../../types/shared";
+import {
+  listDrives,
+  readdir,
+  IpcError,
+  mkdir as ipcMkdir,
+  rename as ipcRename,
+  remove as ipcRemove,
+  openEntry as ipcOpenEntry,
+  revealEntry as ipcRevealEntry
+} from "../ipc";
+import { joinPath, parentPath } from "../utils/format";
 
 /**
  * Explorer state machine.
@@ -13,6 +27,21 @@ import { parentPath } from "../utils/format";
  * History is a linear stack. `navigate()` truncates forward history when
  * the user branches off, matching browser semantics.
  */
+
+// PROTOCOL.md §10 system-path guard surfaces as a pending confirm. A
+// permanent-delete prompt uses the same modal so we funnel both through
+// pendingConfirm rather than growing one modal flavour per mutation kind.
+export type PendingConfirmKind = "system-path" | "permanent-delete";
+
+export interface PendingConfirm {
+  kind: PendingConfirmKind;
+  title: string;
+  message: string;
+  // The closure holds the original args with explicitConfirm flipped to true
+  // so the resume path is a single `await onConfirm()` — no re-plumbing.
+  onConfirm: () => Promise<void>;
+}
+
 export interface ExplorerState {
   drives: Drive[];
   currentPath: string | null;
@@ -26,6 +55,7 @@ export interface ExplorerState {
   history: string[]; // each entry is a path string; `null` (root) not stored
   historyIndex: number; // -1 = no history, else pointer into `history`
   selectedIndex: number; // -1 = no row selected
+  pendingConfirm: PendingConfirm | null;
 
   // actions
   loadDrives: () => Promise<void>;
@@ -38,6 +68,15 @@ export interface ExplorerState {
   goHome: () => void;
   setSelectedIndex: (i: number) => void;
   clearError: () => void;
+
+  // Phase 2.1 — mutation actions
+  createFolder: (name: string) => Promise<void>;
+  renameEntry: (oldPath: string, newName: string) => Promise<void>;
+  deleteEntry: (path: string, mode: RemoveMode) => Promise<void>;
+  openEntry: (path: string) => Promise<void>;
+  revealEntry: (path: string) => Promise<void>;
+  resolvePendingConfirm: () => Promise<void>;
+  cancelPendingConfirm: () => void;
 }
 
 const DEFAULT_PAGE_SIZE = 1000;
@@ -76,6 +115,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   history: [],
   historyIndex: -1,
   selectedIndex: -1,
+  pendingConfirm: null,
 
   async loadDrives() {
     set({ loading: true, error: null });
@@ -249,5 +289,146 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   clearError() {
     set({ error: null });
+  },
+
+  // --- Phase 2.1 mutation actions ------------------------------------------
+
+  async createFolder(name: string) {
+    const parent = get().currentPath;
+    if (parent === null) {
+      set({
+        error: new IpcError({
+          code: "EINVAL",
+          message: "홈 화면에서는 폴더를 만들 수 없습니다",
+          retryable: false
+        })
+      });
+      return;
+    }
+    const path = joinPath(parent, name);
+    const runner = async (explicit: boolean): Promise<void> => {
+      await ipcMkdir({ path, explicitConfirm: explicit });
+      await get().reload();
+    };
+    try {
+      await runner(false);
+    } catch (e) {
+      if (
+        e instanceof IpcError &&
+        e.code === "E_SYSTEM_PATH_CONFIRM_REQUIRED"
+      ) {
+        set({
+          pendingConfirm: {
+            kind: "system-path",
+            title: "시스템 경로 경고",
+            message: `'${path}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            onConfirm: async () => {
+              await runner(true);
+            }
+          }
+        });
+      } else {
+        set({ error: toIpcError(e) });
+      }
+    }
+  },
+
+  async renameEntry(oldPath: string, newName: string) {
+    const parent = parentPath(oldPath);
+    if (parent === null) {
+      set({
+        error: new IpcError({
+          code: "EINVAL",
+          message: "루트 경로는 이름을 변경할 수 없습니다",
+          retryable: false
+        })
+      });
+      return;
+    }
+    const dst = joinPath(parent, newName);
+    const runner = async (explicit: boolean): Promise<void> => {
+      await ipcRename({ src: oldPath, dst, explicitConfirm: explicit });
+      await get().reload();
+    };
+    try {
+      await runner(false);
+    } catch (e) {
+      if (
+        e instanceof IpcError &&
+        e.code === "E_SYSTEM_PATH_CONFIRM_REQUIRED"
+      ) {
+        set({
+          pendingConfirm: {
+            kind: "system-path",
+            title: "시스템 경로 경고",
+            message: `'${oldPath}' 또는 '${dst}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            onConfirm: async () => {
+              await runner(true);
+            }
+          }
+        });
+      } else {
+        set({ error: toIpcError(e) });
+      }
+    }
+  },
+
+  async deleteEntry(path: string, mode: RemoveMode) {
+    const runner = async (explicit: boolean): Promise<void> => {
+      await ipcRemove({ path, mode, explicitConfirm: explicit });
+      await get().reload();
+    };
+    try {
+      await runner(false);
+    } catch (e) {
+      if (
+        e instanceof IpcError &&
+        e.code === "E_SYSTEM_PATH_CONFIRM_REQUIRED"
+      ) {
+        set({
+          pendingConfirm: {
+            kind: "system-path",
+            title: "시스템 경로 경고",
+            message: `'${path}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            onConfirm: async () => {
+              await runner(true);
+            }
+          }
+        });
+      } else {
+        set({ error: toIpcError(e) });
+      }
+    }
+  },
+
+  async openEntry(path: string) {
+    try {
+      await ipcOpenEntry(path);
+    } catch (e) {
+      set({ error: toIpcError(e) });
+    }
+  },
+
+  async revealEntry(path: string) {
+    try {
+      await ipcRevealEntry(path);
+    } catch (e) {
+      set({ error: toIpcError(e) });
+    }
+  },
+
+  async resolvePendingConfirm() {
+    const pending = get().pendingConfirm;
+    if (!pending) return;
+    set({ pendingConfirm: null });
+    try {
+      await pending.onConfirm();
+    } catch (e) {
+      set({ error: toIpcError(e) });
+    }
+  },
+
+  cancelPendingConfirm() {
+    set({ pendingConfirm: null });
   }
 }));

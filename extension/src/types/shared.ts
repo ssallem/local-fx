@@ -1,11 +1,23 @@
 export const HOST_NAME = "com.local.fx" as const;
 
 // Phase 1: ping (Phase 0) + listDrives / readdir / stat are live.
-// Remaining ops (mkdir, writeFile, readFile, rename, remove, copy, move, open,
-// revealInOsExplorer, search, cancel) are defined in PROTOCOL.md §5/§7 and
-// will be added in Phase 2/3. Keep this union in lock-step with the Go
-// dispatcher's registered handler table (native-host/internal/ops).
-export type Op = "ping" | "listDrives" | "readdir" | "stat";
+// Phase 2.1: non-streaming mutation ops (mkdir, rename, remove, open,
+// revealInOsExplorer) added — Host bumped hostMaxProtocolVersion to 2.
+// Remaining ops (writeFile, readFile, copy, move, search, cancel) are
+// defined in PROTOCOL.md §5/§7 and land in Phase 3. Keep this union in
+// lock-step with the Go dispatcher's registered handler table
+// (native-host/internal/ops).
+export type Op =
+  | "ping"
+  | "listDrives"
+  | "readdir"
+  | "stat"
+  // Phase 2.1 — non-streaming mutations
+  | "mkdir"
+  | "rename"
+  | "remove"
+  | "open"
+  | "revealInOsExplorer";
 
 export interface Request<T = unknown> {
   id: string;
@@ -208,6 +220,62 @@ export interface EntryMeta {
   permissions?: string;
 }
 
+// --- 7.5 / 7.8 / 7.9 / 7.11 Phase 2.1 mutation ops --------------------------
+//
+// All five ops return an empty data object (`{}`) on success — the information
+// the caller cares about is "did it succeed?", communicated by `ok: true`.
+// Authority: native-host/internal/ops/{mkdir,rename,remove,open,reveal}.go.
+//
+// `explicitConfirm` is the system-path guard flag (PROTOCOL.md §10): the Host
+// refuses to mutate system-protected locations unless the client sets this to
+// true after presenting a confirmation UI. Omit for ordinary user paths.
+
+// PROTOCOL.md §7.5 mkdir
+export interface MkdirArgs {
+  path: string;
+  // When true, create missing parent directories (mkdir -p semantics). When
+  // false or omitted the Host requires the parent to exist already.
+  recursive?: boolean;
+  explicitConfirm?: boolean;
+}
+
+// PROTOCOL.md §7.8 rename (also covers single-file move within same volume).
+export interface RenameArgs {
+  src: string;
+  dst: string;
+  explicitConfirm?: boolean;
+}
+
+// PROTOCOL.md §7.9 remove. `mode` discriminates between soft delete
+// (OS trash / recycle bin) and hard delete. "trash" is the default UI choice;
+// "permanent" should require an extra UI confirmation on top of
+// explicitConfirm.
+export type RemoveMode = "trash" | "permanent";
+export interface RemoveArgs {
+  path: string;
+  mode: RemoveMode;
+  explicitConfirm?: boolean;
+}
+
+// PROTOCOL.md §7.11 open — launches the OS default handler for the path
+// (double-click equivalent). No confirm flag: opening is non-destructive.
+export interface OpenArgs {
+  path: string;
+}
+
+// PROTOCOL.md §7.11 revealInOsExplorer — opens the parent folder in the OS
+// file explorer with `path` highlighted (Windows: explorer /select, ; macOS:
+// open -R). Non-destructive, same shape as OpenArgs but kept as a distinct
+// type so the two ops cannot be accidentally swapped.
+export interface RevealArgs {
+  path: string;
+}
+
+// Data payload shared by all five mutation ops. Modelled as a string-keyed
+// record with `never` values so the object is empty at the type level —
+// consumers cannot read fields off of it, matching the wire shape `{}`.
+export type EmptyData = Record<string, never>;
+
 // -----------------------------------------------------------------------------
 // op → args / data mapping tables.
 //
@@ -223,6 +291,12 @@ export interface OpArgsMap {
   listDrives: undefined;
   readdir: ReaddirArgs;
   stat: StatArgs;
+  // Phase 2.1 — non-streaming mutations
+  mkdir: MkdirArgs;
+  rename: RenameArgs;
+  remove: RemoveArgs;
+  open: OpenArgs;
+  revealInOsExplorer: RevealArgs;
 }
 
 export interface OpDataMap {
@@ -230,6 +304,12 @@ export interface OpDataMap {
   listDrives: ListDrivesData;
   readdir: ReaddirData;
   stat: EntryMeta;
+  // Phase 2.1 — all mutation ops return an empty success payload
+  mkdir: EmptyData;
+  rename: EmptyData;
+  remove: EmptyData;
+  open: EmptyData;
+  revealInOsExplorer: EmptyData;
 }
 
 // Ops that accept no args (or only an optional args payload). Used by the

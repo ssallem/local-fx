@@ -88,6 +88,48 @@ export function splitPath(path: string): PathSegment[] {
 }
 
 /**
+ * Pick the platform separator for a path. Windows paths begin with a drive
+ * letter; POSIX paths begin with `/`. Unknown styles default to `/`.
+ */
+function sepFor(path: string): "\\" | "/" {
+  if (/^[a-zA-Z]:[\\/]?/.test(path)) return "\\";
+  return "/";
+}
+
+/**
+ * Join a parent path with a child segment, choosing the separator from the
+ * parent. Tolerates trailing separators on the parent.
+ *   "C:\\a",  "b" → "C:\\a\\b"
+ *   "C:\\",   "b" → "C:\\b"
+ *   "/home",  "b" → "/home/b"
+ *   "/",      "b" → "/b"
+ */
+export function joinPath(parent: string, child: string): string {
+  if (!parent) return child;
+  const sep = sepFor(parent);
+  const last = parent[parent.length - 1];
+  if (last === "\\" || last === "/") return `${parent}${child}`;
+  return `${parent}${sep}${child}`;
+}
+
+/**
+ * Last path segment. Intended for display — the Entry.name field should be
+ * preferred when available.
+ *   "C:\\a\\b.txt" → "b.txt"
+ *   "/a/b.txt"      → "b.txt"
+ *   "C:\\"          → "C:\\"
+ *   "/"             → "/"
+ */
+export function basename(path: string): string {
+  if (!path) return "";
+  if (/^[a-zA-Z]:[\\/]?$/.test(path)) return path;
+  if (path === "/") return "/";
+  const idx = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
+  if (idx < 0) return path;
+  return path.slice(idx + 1) || path;
+}
+
+/**
  * Parent path. Returns null when already at a root.
  *   "C:\\a\\b" → "C:\\a"
  *   "C:\\a"    → "C:\\"

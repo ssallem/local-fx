@@ -100,7 +100,70 @@ Frame: [uint32 LE length][UTF-8 JSON body]  (Chrome Native Messaging 표준)
   - WARNING-3: explorer store `loadMore` path Set 기반 중복 제거 + FileList key를 `entry.path`로 정리
   - **재빌드 검증**: `npm run build` 성공 (prebuild 정상/tsc pass/vite 56 modules), `tsc --noEmit` exit 0
   - 미해결 잔여 WARNING (후속 추적): stat symlink 주석, readdir 대용량 perf 벤치마크, /Volumes 부분결과, drives_windows errno
-- **[단계 D 진행 중]** Git 커밋
+- **[단계 D 완료]** 커밋 `bed75fc feat: scaffold Chrome local file explorer extension (Phase 0 + Phase 1 kickoff)` — 69 파일, 9515 줄
+- **[미션 3 (2026-04-22)]** "1,2,3,4 네가 다 진행해 줄 수 있잖아?" — Phase 7 보고서의 사용자 다음 액션 4단계를 에이전트가 실행:
+  1. Go 툴체인 확인/설치 + `go test ./...` + `go build -o bin\fx-host.exe`
+  2. `generate-dev-key.ps1` 실행 → RSA 키페어 + manifest.json `key` 주입 + 확장 ID 산출
+  3. `npm run build` + `install.ps1` (HKCU 레지스트리·Native Messaging manifest 등록)
+  4. Chrome CLI로 확장 로드 (dist/ 언팩드) + 새 탭에서 탐색기 열기. Ping Host 버튼 클릭은 자동화 제한 가능성.
+
+### 미션 3 실행 결과 (실행 담당자 1명)
+- **Go 1.26.2** winget 비대화식 설치 성공. `go build` OK, `bin/fx-host.exe` 3.5MB 생성.
+- **Go test 1건 실패**: `TestMapFSError_NotDir` (errmap_test.go:48) — Windows에서 파일을 디렉터리처럼 open 시 `ENOTDIR` 대신 `ENOENT`가 나옴. Windows-specific 매핑 이슈, 빌드·배포 무관.
+- **Extension ID**: `cjaibkecpdcabflelcjciceofknnpmck`
+- **generate-dev-key.ps1 — PowerShell 5.1 비호환** 발견: `ExportPkcs8PrivateKey`는 PS 7.2+ 필요. 실행 담당자가 `pwsh 7.5.4`로 우회 성공. **install.ps1이 powershell.exe(5.1)로 이 스크립트를 호출하면 재발** → 후속 수정 필요.
+- **install.ps1**: `pwsh`로 실행 성공. HKCU Chrome+Edge 양쪽 등록, `%LOCALAPPDATA%\LocalFx\{com.local.fx.json, integrity.json}` 생성 확인.
+- **Chrome 실행**: v147.0.7727.56, 격리 프로파일 `$TEMP\LocalFxChromeProfile`로 `--load-extension=dist/` + `chrome-extension://<id>/tab.html` 자동 오픈. 사용자 기존 프로파일 무오염.
+- **보너스 — Host stdio smoke**: 직접 length-prefixed JSON 프레임으로 `fx-host.exe` 호출 → `{"ok":true,"data":{"pong":true,"hostVersion":"0.0.1","hostMaxProtocolVersion":1,"os":"windows","arch":"amd64","serverTs":...}}` **실제 응답 수신**. Host 바이너리 자체 정상 동작 입증. exit code 0.
+
+### 남은 과제 (후속 플래그)
+- **P1**: `install.ps1` 내 `generate-dev-key` 호출을 `pwsh` 우선 → `powershell.exe` fallback으로 변경
+- **P2**: `errmap_test.go:48` Windows 분기 추가 또는 fixture 변경 (TestMapFSError_NotDir)
+- **P3**: `installer/windows/smoke-ping.ps1` 추가 (length-prefix stdio ping 왕복 CLI 검증 스크립트, 실행 담당자가 ad-hoc 작성한 것을 영구화)
+- **사용자 수동 확인**: Chrome 창에서 "Ping Host" 버튼 클릭 → UI에 pong 응답 표시 확인
+
+## 미션 4 (2026-04-22): Phase 2.1 구현 착수
+- **원본 요청:** "다음 확장 기능 설계하고 진행하자" (사용자가 실제 Chrome에서 탐색기 UI 동작 확인 후)
+- **승인된 플랜:** `C:\Users\mellass\.claude\plans\harmonic-chasing-narwhal.md` — "## Phase 2 실행 계획" 섹션
+- **이번 세션 스코프:** Phase 2.1 (비스트리밍 CRUD + OS 연동 + allowlist confirm)
+- **핵심 op:** mkdir, rename, remove(trash/permanent), open, revealInOsExplorer
+- **핵심 설계 결정:**
+  - macOS Trash = **osascript** (CGO 대신, 서명 복잡도 회피)
+  - 원안 2.2(allowlist)를 2.1에 통합
+  - 컨텍스트 메뉴 / 다중 선택 / 스트리밍은 후속 세션
+  - rename은 same-dir만, permanent remove는 빈 폴더/단일 파일만
+  - PROTOCOL_VERSION 1→2 bump (ipc.ts + ping.go 같은 커밋)
+
+### 팀 구성
+- **개발자 A (Go)**: errmap 확장 + safety allowlist + ops(mkdir/rename/remove/open) + platform(shell_win/darwin/other) + registry + ping bump
+- **개발자 B (TS)**: shared.ts 타입 확장 + ipc.ts 헬퍼 + PROTOCOL_VERSION bump
+- **개발자 C (UI)**: store 액션 + ConfirmDialog + RenameDialog + Toolbar "새 폴더" + App.tsx 키바인딩
+- **검토자**: team-critic 1회
+
+### 실행 결과
+- **[A 완료]** Go: 14 신규 + 8 수정, ~60 테스트 추가. `go test ./...` 101 PASS + 2 skip. `go vet` clean. `go build` 3.8MB. SHFileOperationW 더블-NUL 수동 append, osascript escape `\` + `"`, allowlist hasPrefixBoundary separator 체크, Windows 5/32/80/183/112 errno 매핑, HostMaxProtocolVersion=2.
+- **[B 완료]** TS: Op 유니온 9개, OpArgsMap/OpDataMap 각 9개, MkdirArgs/RenameArgs/RemoveArgs/OpenArgs/RevealArgs + RemoveMode + EmptyData, PROTOCOL_VERSION=2 bump, 헬퍼 mkdir/rename/remove/openEntry/revealEntry (window.open 충돌 회피). `tsc --noEmit` PASS.
+- **[C 완료]** UI: 3 신규 (ConfirmDialog, RenameDialog, dialogs/index.ts) + 6 수정. store 액션 10→17 (createFolder/renameEntry/deleteEntry/openEntry/revealEntry/resolvePendingConfirm/cancelPendingConfirm + pendingConfirm 상태). 키바인딩 F2/Del/Shift+Del + Enter 파일 open. 다이얼로그 포커스 트랩/variant 3종. `tsc --noEmit` PASS, `vite build` 성공 (JS 166KB gzip 53KB).
+- **[Critic 1차]** CRITICAL 2 + WARNING 5 + SUGGESTION 5 적발
+- **[수정 1차 (개발자 15)]** CRITICAL 전부 + WARNING 2 수정:
+  - P2-CRITICAL-1: ConfirmDialog Enter 전역 핸들러 제거 → 브라우저 기본 동작(포커스된 버튼 클릭)에 위임. danger/warning variant Cancel 포커스에서 Enter → onCancel (우발 영구삭제 방지)
+  - P2-CRITICAL-2: SHFileOperationW `AnyOperationsAborted` OUT 필드 검사 삭제. silent mode 거짓 오류 제거, 반환값 0만 성공 기준
+  - P2-WARNING-1: osascript NewReplacer에 `\n`/`\r` escape 추가
+  - P2-WARNING-2: Windows rename cross-dir 체크에 `strings.EqualFold` 분기 + rename_windows_test.go 2 케이스 추가
+  - 재검증: `go test ./...` PASS, `go build` 성공, `tsc --noEmit` PASS, `vite build` 59 modules 540ms
+
+### 잔여 WARNING/SUGGESTION (후속 플래그)
+- ErrTrashUnavailable 중복 처리(remove.go + errmap.go) — 논리적으로 안전
+- macOS `/Applications` allowlist 포함 여부 재논의 (계획 파일 미명시)
+- Windows SHFileOperationW 반환 에러코드 0x7C/0x78 등 전용 매핑 테이블
+- FileList 단일 클릭으로 openEntry 호출(더블클릭과 동시) — Phase 2.2 컨텍스트 메뉴에서 정리
+- RenameDialog null byte 검증 (Go 측에서 이미 거부되지만 UI 레벨 조기 차단 권장)
+- Ping hostMaxProtocolVersion 상수 `internal/version` 패키지 승격 (아직 ops 내부)
+
+### 다음 단계 (후속 세션)
+- **Phase 2.2**: 컨텍스트 메뉴, 다중 선택(Shift/Ctrl+Click), 클립보드(Ctrl+C/X/V)
+- **Phase 2.3**: 스트리밍 copy + 진행률 + 취소 + background.ts Event 라우팅 인프라
+- **Phase 2.4**: move + 충돌 3경로 + 부분 실패 요약 + 디렉터리 재귀
 - **[Phase 6 Round 2 — 신규 CRITICAL 수정 (개발자 8)]**
   - N-1: TS `ErrorCode` 유니온에 `E_UNKNOWN_OP`/`E_BAD_REQUEST`/`E_INTERNAL` 3개 추가 → 총 22개(§8 20 + transport-local 2)
   - N-1: PROTOCOL.md §8에 3개 행 + 서두 총개수 20 명시

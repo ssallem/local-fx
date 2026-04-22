@@ -64,13 +64,19 @@ func (windowsOS) ListDrives(_ context.Context) ([]Drive, error) {
 	return out, nil
 }
 
-// Trash / OpenDefault / RevealInOS are Phase 2. Declared here so the
-// windowsOS struct satisfies the OS interface; each returns the Phase 2
-// placeholder error so accidental Phase 1 callers fail fast rather than
-// silently doing nothing.
-func (windowsOS) Trash(context.Context, string) error       { return ErrUnsupportedOS }
-func (windowsOS) OpenDefault(context.Context, string) error { return ErrUnsupportedOS }
-func (windowsOS) RevealInOS(context.Context, string) error  { return ErrUnsupportedOS }
+// Trash / OpenDefault / RevealInOS delegate to build-tagged shell_windows.go
+// helpers so the windowsOS struct keeps the OS interface satisfied while the
+// heavy lifting (SHFileOperationW, ShellExecuteW, explorer /select) lives
+// next door in a focused shell file.
+func (windowsOS) Trash(ctx context.Context, path string) error {
+	return shellTrash(ctx, path)
+}
+func (windowsOS) OpenDefault(ctx context.Context, path string) error {
+	return shellOpenDefault(ctx, path)
+}
+func (windowsOS) RevealInOS(ctx context.Context, path string) error {
+	return shellRevealInOS(ctx, path)
+}
 
 // getLogicalDriveStrings returns each mounted drive as "C:\\", "D:\\", ...
 func getLogicalDriveStrings() ([]string, error) {

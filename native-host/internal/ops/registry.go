@@ -53,8 +53,15 @@ func Registered() []string {
 }
 
 func init() {
+	// Phase 0/1 — read-only ops.
 	Register("ping", Ping)
 	Register("listDrives", ListDrives)
 	Register("readdir", Readdir)
 	Register("stat", Stat)
+	// Phase 2.1 — mutating + OS-integration ops. See PROTOCOL.md §7.5–§7.11.
+	Register("mkdir", Mkdir)
+	Register("rename", Rename)
+	Register("remove", Remove)
+	Register("open", Open)
+	Register("revealInOsExplorer", RevealInOsExplorer)
 }

@@ -19,7 +19,11 @@ const Version = "0.0.1"
 // HostMaxProtocolVersion is the highest protocol version this host binary
 // speaks. PROTOCOL.md §7.1 requires the ping response to advertise it so the
 // extension can detect version skew at handshake time.
-const HostMaxProtocolVersion = 1
+//
+// Bumped to 2 for Phase 2.1: the host now understands mkdir/rename/remove/
+// open/revealInOsExplorer. Extensions speaking PROTOCOL_VERSION=1 still work
+// for the Phase 0/1 read-only op subset.
+const HostMaxProtocolVersion = 2
 
 // Ping is a liveness/identity probe used during extension <-> host handshake.
 // It intentionally takes no arguments so it can double as the smoke test in

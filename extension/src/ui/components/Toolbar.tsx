@@ -3,9 +3,13 @@ import { Breadcrumb } from "./Breadcrumb";
 
 interface Props {
   onToggleDevPanel: () => void;
+  onCreateFolder: () => void;
 }
 
-export function Toolbar({ onToggleDevPanel }: Props): JSX.Element {
+export function Toolbar({
+  onToggleDevPanel,
+  onCreateFolder
+}: Props): JSX.Element {
   const currentPath = useExplorerStore((s) => s.currentPath);
   const historyIndex = useExplorerStore((s) => s.historyIndex);
   const history = useExplorerStore((s) => s.history);
@@ -17,6 +21,7 @@ export function Toolbar({ onToggleDevPanel }: Props): JSX.Element {
   const canBack = historyIndex >= 0; // at 0 → step back to home
   const canForward = historyIndex < history.length - 1;
   const canUp = currentPath !== null;
+  const canCreate = currentPath !== null;
 
   return (
     <header className="toolbar">
@@ -63,6 +68,15 @@ export function Toolbar({ onToggleDevPanel }: Props): JSX.Element {
           aria-label="Reload"
         >
           ⟳
+        </button>
+        <button
+          type="button"
+          onClick={onCreateFolder}
+          disabled={!canCreate}
+          title="새 폴더"
+          aria-label="새 폴더"
+        >
+          + 새 폴더
         </button>
       </div>
       <Breadcrumb path={currentPath} />

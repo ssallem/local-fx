@@ -94,3 +94,12 @@ func TestPing_RegisteredInRegistry(t *testing.T) {
 		t.Fatal("ping handler not registered; registry init() did not run")
 	}
 }
+
+// TestPing_HostMaxProtocolVersionIs2 locks in the Phase 2.1 bump. The
+// version constant itself doubles as the wire-format contract; any future
+// bump MUST update PROTOCOL.md + extension/src/ui/ipc.ts in the same commit.
+func TestPing_HostMaxProtocolVersionIs2(t *testing.T) {
+	if HostMaxProtocolVersion != 2 {
+		t.Errorf("HostMaxProtocolVersion: got %d, want 2 (Phase 2.1 bump)", HostMaxProtocolVersion)
+	}
+}

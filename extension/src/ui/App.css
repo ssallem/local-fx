@@ -512,3 +512,110 @@ button:disabled {
   border: 1px solid var(--error-border);
   border-radius: 4px;
 }
+
+/* ------------------------------------------------------------ Dialogs */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  min-width: 320px;
+  max-width: 480px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.dialog h2 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dialog-message {
+  margin: 0 0 16px 0;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.dialog-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dialog button {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dialog button:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.dialog button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dialog button.danger {
+  background: #d63939;
+  color: #fff;
+  border-color: #c12c2c;
+}
+
+.dialog button.danger:hover:not(:disabled) {
+  background: #c12c2c;
+}
+
+.dialog button.warning {
+  background: #e68a00;
+  color: #fff;
+  border-color: #cc7a00;
+}
+
+.dialog button.warning:hover:not(:disabled) {
+  background: #cc7a00;
+}
+
+.dialog input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  font: inherit;
+}
+
+.dialog input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.dialog input.invalid {
+  border-color: #d63939;
+}
+
+.dialog-error {
+  color: #d63939;
+  font-size: 12px;
+  margin-bottom: 8px;
+}

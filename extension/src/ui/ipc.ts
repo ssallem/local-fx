@@ -1,12 +1,16 @@
 import type {
   Drive,
+  EmptyData,
   EntryMeta,
   ErrorResponse,
+  MkdirArgs,
   OpArgsMap,
   OpDataMap,
   OpNoArgs,
   ReaddirArgs,
   ReaddirData,
+  RemoveArgs,
+  RenameArgs,
   Request,
   Response
 } from "../types/shared";
@@ -15,7 +19,11 @@ import type {
 // protocol version it speaks on every request. Bumping this constant here is
 // the single point of truth on the UI side; the Go host compares against
 // hostMaxProtocolVersion and rejects with E_PROTOCOL when we exceed it.
-const PROTOCOL_VERSION = 1;
+//
+// Phase 2.1 bumped this to 2 alongside the mutation ops (mkdir / rename /
+// remove / open / revealInOsExplorer). The Go Host's hostMaxProtocolVersion
+// is also 2 — do NOT advance this past 2 until the Host follows.
+const PROTOCOL_VERSION = 2;
 
 // F-8: MV3 service worker / modern browser UI always exposes
 // crypto.randomUUID(). No fallback needed — call it directly so every
@@ -139,6 +147,14 @@ function unwrap<T>(resp: Response<T>): T {
   throw new IpcError(resp.error);
 }
 
+// Void-returning variant for Phase 2.1 mutation ops whose success payload is
+// the empty object `{}`. Sharing the error path with unwrap() keeps IpcError
+// construction consistent across all helpers; we just drop the empty data on
+// the floor instead of returning it.
+function unwrapVoid(resp: Response<EmptyData>): void {
+  if (!resp.ok) throw new IpcError(resp.error);
+}
+
 export async function listDrives(): Promise<Drive[]> {
   const resp = await request("listDrives");
   return unwrap(resp).drives;
@@ -152,4 +168,40 @@ export async function readdir(args: ReaddirArgs): Promise<ReaddirData> {
 export async function stat(path: string): Promise<EntryMeta> {
   const resp = await request("stat", { path });
   return unwrap(resp);
+}
+
+// --- Phase 2.1 mutation helpers ---------------------------------------------
+//
+// These wrap request() the same way listDrives/readdir/stat do: build the
+// envelope, throw IpcError on failure, resolve `void` on success. Callers
+// that need the raw Response<EmptyData> (e.g. to branch on
+// E_SYSTEM_PATH_CONFIRM_REQUIRED without catch) should keep using
+// request("mkdir", ...) directly.
+
+export async function mkdir(args: MkdirArgs): Promise<void> {
+  const resp = await request("mkdir", args);
+  unwrapVoid(resp);
+}
+
+export async function rename(args: RenameArgs): Promise<void> {
+  const resp = await request("rename", args);
+  unwrapVoid(resp);
+}
+
+export async function remove(args: RemoveArgs): Promise<void> {
+  const resp = await request("remove", args);
+  unwrapVoid(resp);
+}
+
+// Named openEntry / revealEntry rather than open / reveal to avoid clashing
+// with the DOM globals `window.open` and future reveal-style APIs when
+// consumers do `import * as ipc`.
+export async function openEntry(path: string): Promise<void> {
+  const resp = await request("open", { path });
+  unwrapVoid(resp);
+}
+
+export async function revealEntry(path: string): Promise<void> {
+  const resp = await request("revealInOsExplorer", { path });
+  unwrapVoid(resp);
 }

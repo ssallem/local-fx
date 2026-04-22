@@ -7,8 +7,9 @@ import { FileList } from "./components/FileList";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { DevPanel } from "./components/DevPanel";
-import { formatBytes } from "./utils/format";
-import type { Drive } from "../types/shared";
+import { ConfirmDialog, RenameDialog } from "./components/dialogs";
+import { basename, formatBytes } from "./utils/format";
+import type { Drive, RemoveMode } from "../types/shared";
 
 /**
  * Home screen (drive grid). Shown when currentPath === null so first-launch
@@ -59,6 +60,12 @@ function HomeScreen(): JSX.Element {
   );
 }
 
+type RenameDialogState =
+  | { mode: "create"; initialName: string; title: string }
+  | { mode: "rename"; path: string; initialName: string; title: string };
+
+type DeleteConfirmState = { path: string; mode: RemoveMode };
+
 export function App(): JSX.Element {
   const currentPath = useExplorerStore((s) => s.currentPath);
   const loadDrives = useExplorerStore((s) => s.loadDrives);
@@ -70,9 +77,33 @@ export function App(): JSX.Element {
   const selectedIndex = useExplorerStore((s) => s.selectedIndex);
   const setSelectedIndex = useExplorerStore((s) => s.setSelectedIndex);
   const navigate = useExplorerStore((s) => s.navigate);
+  const openEntry = useExplorerStore((s) => s.openEntry);
+  const createFolder = useExplorerStore((s) => s.createFolder);
+  const renameEntry = useExplorerStore((s) => s.renameEntry);
+  const deleteEntry = useExplorerStore((s) => s.deleteEntry);
+  const pendingConfirm = useExplorerStore((s) => s.pendingConfirm);
+  const resolvePendingConfirm = useExplorerStore(
+    (s) => s.resolvePendingConfirm
+  );
+  const cancelPendingConfirm = useExplorerStore((s) => s.cancelPendingConfirm);
 
   const [devOpen, setDevOpen] = useState(false);
   const toggleDev = useCallback(() => setDevOpen((v) => !v), []);
+
+  const [renameDialog, setRenameDialog] = useState<RenameDialogState | null>(
+    null
+  );
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(
+    null
+  );
+
+  const openCreateFolder = useCallback(() => {
+    setRenameDialog({
+      mode: "create",
+      initialName: "새 폴더",
+      title: "새 폴더 만들기"
+    });
+  }, []);
 
   // Bootstrap
   useEffect(() => {
@@ -100,6 +131,14 @@ export function App(): JSX.Element {
 
       if (inEditable) return;
 
+      // Suppress keyboard nav while any modal is open — ConfirmDialog and
+      // RenameDialog own Enter/Escape/Tab inside their own listeners.
+      const modalOpen =
+        pendingConfirm !== null ||
+        renameDialog !== null ||
+        deleteConfirm !== null;
+      if (modalOpen) return;
+
       if (e.key === "Backspace") {
         e.preventDefault();
         void goUp();
@@ -120,11 +159,36 @@ export function App(): JSX.Element {
         void reload();
         return;
       }
+      if (e.key === "F2") {
+        const entry = entries[selectedIndex];
+        if (!entry) return;
+        e.preventDefault();
+        setRenameDialog({
+          mode: "rename",
+          path: entry.path,
+          initialName: entry.name,
+          title: "이름 변경"
+        });
+        return;
+      }
+      if (e.key === "Delete") {
+        const entry = entries[selectedIndex];
+        if (!entry) return;
+        e.preventDefault();
+        setDeleteConfirm({
+          path: entry.path,
+          mode: e.shiftKey ? "permanent" : "trash"
+        });
+        return;
+      }
       if (e.key === "Enter") {
         const entry = entries[selectedIndex];
-        if (entry && entry.type === "directory") {
-          e.preventDefault();
+        if (!entry) return;
+        e.preventDefault();
+        if (entry.type === "directory") {
           void navigate(entry.path);
+        } else {
+          void openEntry(entry.path);
         }
         return;
       }
@@ -169,12 +233,19 @@ export function App(): JSX.Element {
     entries,
     selectedIndex,
     setSelectedIndex,
-    navigate
+    navigate,
+    openEntry,
+    pendingConfirm,
+    renameDialog,
+    deleteConfirm
   ]);
 
   return (
     <div className="app">
-      <Toolbar onToggleDevPanel={toggleDev} />
+      <Toolbar
+        onToggleDevPanel={toggleDev}
+        onCreateFolder={openCreateFolder}
+      />
       <ErrorBanner />
       {currentPath === null ? (
         <div className="main-home">
@@ -188,6 +259,65 @@ export function App(): JSX.Element {
       )}
       <StatusBar />
       <DevPanel open={devOpen} onClose={() => setDevOpen(false)} />
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          variant={
+            pendingConfirm.kind === "system-path" ? "warning" : "danger"
+          }
+          confirmLabel="계속"
+          cancelLabel="취소"
+          onConfirm={() => {
+            void resolvePendingConfirm();
+          }}
+          onCancel={cancelPendingConfirm}
+        />
+      )}
+
+      {renameDialog && (
+        <RenameDialog
+          initialName={renameDialog.initialName}
+          title={renameDialog.title}
+          onConfirm={(name) => {
+            if (renameDialog.mode === "create") {
+              void createFolder(name);
+            } else {
+              void renameEntry(renameDialog.path, name);
+            }
+            setRenameDialog(null);
+          }}
+          onCancel={() => setRenameDialog(null)}
+        />
+      )}
+
+      {deleteConfirm && (
+        <ConfirmDialog
+          title={
+            deleteConfirm.mode === "permanent"
+              ? "영구 삭제"
+              : "휴지통으로 이동"
+          }
+          message={
+            deleteConfirm.mode === "permanent"
+              ? `'${basename(deleteConfirm.path)}'를 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.`
+              : `'${basename(deleteConfirm.path)}'를 휴지통으로 이동합니다.`
+          }
+          variant="danger"
+          confirmLabel={
+            deleteConfirm.mode === "permanent"
+              ? "영구 삭제"
+              : "휴지통으로 이동"
+          }
+          cancelLabel="취소"
+          onConfirm={() => {
+            void deleteEntry(deleteConfirm.path, deleteConfirm.mode);
+            setDeleteConfirm(null);
+          }}
+          onCancel={() => setDeleteConfirm(null)}
+        />
+      )}
     </div>
   );
 }

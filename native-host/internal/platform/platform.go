@@ -59,3 +59,30 @@ func ListDrives(ctx context.Context) ([]Drive, error) {
 	}
 	return Current.ListDrives(ctx)
 }
+
+// Trash moves path to the platform recycle bin via the active OS impl.
+// Returns ErrUnsupportedOS on platforms with no implementation,
+// ErrTrashUnavailable when the trash is disabled/unreachable, or a
+// native syscall error that mapFSError will classify.
+func Trash(ctx context.Context, path string) error {
+	if Current == nil {
+		return ErrUnsupportedOS
+	}
+	return Current.Trash(ctx, path)
+}
+
+// OpenDefault launches path with the OS's default handler.
+func OpenDefault(ctx context.Context, path string) error {
+	if Current == nil {
+		return ErrUnsupportedOS
+	}
+	return Current.OpenDefault(ctx, path)
+}
+
+// RevealInOS opens a file manager window focused on path.
+func RevealInOS(ctx context.Context, path string) error {
+	if Current == nil {
+		return ErrUnsupportedOS
+	}
+	return Current.RevealInOS(ctx, path)
+}

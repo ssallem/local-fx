@@ -72,9 +72,15 @@ func (darwinOS) ListDrives(_ context.Context) ([]Drive, error) {
 	return out, nil
 }
 
-func (darwinOS) Trash(context.Context, string) error       { return ErrUnsupportedOS }
-func (darwinOS) OpenDefault(context.Context, string) error { return ErrUnsupportedOS }
-func (darwinOS) RevealInOS(context.Context, string) error  { return ErrUnsupportedOS }
+func (darwinOS) Trash(ctx context.Context, path string) error {
+	return shellTrash(ctx, path)
+}
+func (darwinOS) OpenDefault(ctx context.Context, path string) error {
+	return shellOpenDefault(ctx, path)
+}
+func (darwinOS) RevealInOS(ctx context.Context, path string) error {
+	return shellRevealInOS(ctx, path)
+}
 
 // statfsDrive populates the size/fs-type fields for a given mount point.
 // Returns ok=false when the mount is inaccessible (permission denied on a
