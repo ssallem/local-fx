@@ -5,6 +5,127 @@ import type {
   ReaddirArgs,
   RemoveMode
 } from "../../types/shared";
+
+// Column-level UI state kept in-store so FileList can be purely presentational.
+// Sort is server-driven (Go readdir handles the ordering); columnWidths and
+// columnOrder are pure UI prefs persisted to localStorage.
+export type SortableField = "name" | "size" | "modified";
+export type ColumnWidths = { name: number; size: number; modified: number };
+export type ColumnOrder = ("name" | "size" | "modified")[];
+
+const LS_WIDTHS_KEY = "explorer.columnWidths";
+const LS_ORDER_KEY = "explorer.columnOrder";
+const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
+  name: 400,
+  size: 100,
+  modified: 200
+};
+const DEFAULT_COLUMN_ORDER: ColumnOrder = ["name", "size", "modified"];
+// min widths mirror the handle-drag clamp in FileList.tsx. Duplicated
+// intentionally so the store can defensively clamp persisted values on load
+// without importing UI-layer constants.
+const MIN_COLUMN_WIDTHS: ColumnWidths = { name: 80, size: 60, modified: 120 };
+
+/**
+ * Sanitize a persisted width value. `localStorage` is untrusted input —
+ * another tab, an extension, or a corrupted write can leave us with strings,
+ * `null`, objects, or `NaN`. Any of those coerced through `Number()` +
+ * `Math.max` would poison `gridTemplateColumns` with `"NaNpx"` and collapse
+ * the layout. We reject anything that isn't a finite positive integer and
+ * fall back to the default before the floor / min clamp.
+ */
+function sanitizeWidth(
+  val: unknown,
+  defaultVal: number,
+  min: number
+): number {
+  const n = Math.floor(Number(val));
+  if (!Number.isFinite(n) || n <= 0) return defaultVal;
+  return Math.max(min, n);
+}
+
+function loadColumnWidths(): ColumnWidths {
+  if (typeof localStorage === "undefined") return { ...DEFAULT_COLUMN_WIDTHS };
+  try {
+    const raw = localStorage.getItem(LS_WIDTHS_KEY);
+    if (!raw) return { ...DEFAULT_COLUMN_WIDTHS };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return { ...DEFAULT_COLUMN_WIDTHS };
+    }
+    const p = parsed as Record<string, unknown>;
+    return {
+      name: sanitizeWidth(
+        p.name,
+        DEFAULT_COLUMN_WIDTHS.name,
+        MIN_COLUMN_WIDTHS.name
+      ),
+      size: sanitizeWidth(
+        p.size,
+        DEFAULT_COLUMN_WIDTHS.size,
+        MIN_COLUMN_WIDTHS.size
+      ),
+      modified: sanitizeWidth(
+        p.modified,
+        DEFAULT_COLUMN_WIDTHS.modified,
+        MIN_COLUMN_WIDTHS.modified
+      )
+    };
+  } catch {
+    return { ...DEFAULT_COLUMN_WIDTHS };
+  }
+}
+
+function loadColumnOrder(): ColumnOrder {
+  if (typeof localStorage === "undefined") return [...DEFAULT_COLUMN_ORDER];
+  try {
+    const raw = localStorage.getItem(LS_ORDER_KEY);
+    if (!raw) return [...DEFAULT_COLUMN_ORDER];
+    const parsed = JSON.parse(raw);
+    const required: SortableField[] = ["name", "size", "modified"];
+    const valid =
+      Array.isArray(parsed) &&
+      parsed.length === 3 &&
+      required.every((k) => parsed.includes(k)) &&
+      parsed.every((v) => required.includes(v as SortableField));
+    if (!valid) return [...DEFAULT_COLUMN_ORDER];
+    return parsed as ColumnOrder;
+  } catch {
+    return [...DEFAULT_COLUMN_ORDER];
+  }
+}
+
+// Debounced persistence for column widths. `setColumnWidth` fires on every
+// mousemove during a resize drag — that's dozens to hundreds of synchronous
+// `localStorage.setItem` calls per second, which blocks the main thread and
+// causes visible jank. Coalescing to a single write 300ms after the drag
+// settles keeps the gesture smooth. A refresh within 300ms of mouseup loses
+// the very last pixel-level update, which is an acceptable trade; the
+// in-memory state is already correct for the rest of the session.
+let columnWidthsPersistTimer: number | undefined;
+function persistColumnWidthsDebounced(w: ColumnWidths): void {
+  if (typeof localStorage === "undefined") return;
+  if (columnWidthsPersistTimer !== undefined) {
+    window.clearTimeout(columnWidthsPersistTimer);
+  }
+  columnWidthsPersistTimer = window.setTimeout(() => {
+    try {
+      localStorage.setItem(LS_WIDTHS_KEY, JSON.stringify(w));
+    } catch {
+      // Quota / private-mode failures are non-fatal: state still works in-memory.
+    }
+    columnWidthsPersistTimer = undefined;
+  }, 300);
+}
+
+function persistColumnOrder(o: ColumnOrder): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(LS_ORDER_KEY, JSON.stringify(o));
+  } catch {
+    // ignore — see persistColumnWidthsDebounced note.
+  }
+}
 import {
   listDrives,
   readdir,
@@ -57,6 +178,12 @@ export interface ExplorerState {
   selectedIndex: number; // -1 = no row selected
   pendingConfirm: PendingConfirm | null;
 
+  // --- Phase 2.2 UI polish — sort + column layout ------------------------
+  sortField: SortableField;
+  sortOrder: "asc" | "desc";
+  columnWidths: ColumnWidths;
+  columnOrder: ColumnOrder;
+
   // actions
   loadDrives: () => Promise<void>;
   navigate: (path: string) => Promise<void>;
@@ -68,6 +195,11 @@ export interface ExplorerState {
   goHome: () => void;
   setSelectedIndex: (i: number) => void;
   clearError: () => void;
+
+  // Phase 2.2 UI polish
+  setSort: (field: SortableField, order?: "asc" | "desc") => Promise<void>;
+  setColumnWidth: (col: SortableField, px: number) => void;
+  setColumnOrder: (order: ColumnOrder) => void;
 
   // Phase 2.1 — mutation actions
   createFolder: (name: string) => Promise<void>;
@@ -117,6 +249,11 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   selectedIndex: -1,
   pendingConfirm: null,
 
+  sortField: "name",
+  sortOrder: "asc",
+  columnWidths: loadColumnWidths(),
+  columnOrder: loadColumnOrder(),
+
   async loadDrives() {
     set({ loading: true, error: null });
     try {
@@ -130,7 +267,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   async navigate(path: string) {
     set({ loading: true, error: null, selectedIndex: -1 });
     try {
-      const data = await fetchDir(path);
+      const { sortField, sortOrder } = get();
+      const data = await fetchDir(path, {
+        sort: { field: sortField, order: sortOrder }
+      });
       const { history, historyIndex } = get();
       // Truncate forward history and append the new path.
       const truncated = history.slice(0, historyIndex + 1);
@@ -183,7 +323,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     if (!prev) return;
     set({ loading: true, error: null, selectedIndex: -1 });
     try {
-      const data = await fetchDir(prev);
+      const { sortField, sortOrder } = get();
+      const data = await fetchDir(prev, {
+        sort: { field: sortField, order: sortOrder }
+      });
       set({
         currentPath: prev,
         entries: data.entries,
@@ -206,7 +349,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     if (!next) return;
     set({ loading: true, error: null, selectedIndex: -1 });
     try {
-      const data = await fetchDir(next);
+      const { sortField, sortOrder } = get();
+      const data = await fetchDir(next, {
+        sort: { field: sortField, order: sortOrder }
+      });
       set({
         currentPath: next,
         entries: data.entries,
@@ -228,7 +374,11 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     if (currentPath === null || nextCursor === null) return;
     set({ loading: true, error: null });
     try {
-      const data = await fetchDir(currentPath, { cursor: nextCursor });
+      const { sortField, sortOrder } = get();
+      const data = await fetchDir(currentPath, {
+        cursor: nextCursor,
+        sort: { field: sortField, order: sortOrder }
+      });
       // Deduplicate by path: the underlying directory may have changed
       // between pages (file renamed/added/removed), so the Host can return
       // an entry we've already seen. Keeping the first occurrence preserves
@@ -256,7 +406,10 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     }
     set({ loading: true, error: null, selectedIndex: -1 });
     try {
-      const data = await fetchDir(currentPath);
+      const { sortField, sortOrder } = get();
+      const data = await fetchDir(currentPath, {
+        sort: { field: sortField, order: sortOrder }
+      });
       set({
         entries: data.entries,
         total: data.total,
@@ -430,5 +583,53 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
 
   cancelPendingConfirm() {
     set({ pendingConfirm: null });
+  },
+
+  // --- Phase 2.2 UI polish -------------------------------------------------
+
+  async setSort(field, order) {
+    const current = get();
+    const nextOrder: "asc" | "desc" =
+      order ??
+      (current.sortField === field && current.sortOrder === "asc"
+        ? "desc"
+        : "asc");
+    // Short-circuit a no-op click (same field + same resolved order).
+    if (current.sortField === field && current.sortOrder === nextOrder) {
+      return;
+    }
+    set({ sortField: field, sortOrder: nextOrder });
+    // Reload applies the new sort. On the home screen there's nothing to
+    // reload — the state still persists for the next navigate().
+    if (current.currentPath !== null) {
+      await get().reload();
+    }
+  },
+
+  setColumnWidth(col, px) {
+    // Defend against NaN / non-finite input: a stale closure, a rogue
+    // extension, or arithmetic on undefined could call us with garbage.
+    // Silently drop instead of poisoning the grid template.
+    const n = Math.floor(Number(px));
+    if (!Number.isFinite(n) || n <= 0) return;
+    const current = get().columnWidths;
+    const clamped = Math.max(MIN_COLUMN_WIDTHS[col], n);
+    if (current[col] === clamped) return;
+    const next: ColumnWidths = { ...current, [col]: clamped };
+    set({ columnWidths: next });
+    persistColumnWidthsDebounced(next);
+  },
+
+  setColumnOrder(order) {
+    // Defensive validation: caller may pass a mutated array. Reject anything
+    // that doesn't cover exactly the three fields without duplicates.
+    const required: SortableField[] = ["name", "size", "modified"];
+    const ok =
+      order.length === 3 &&
+      required.every((k) => order.includes(k)) &&
+      new Set(order).size === 3;
+    if (!ok) return;
+    set({ columnOrder: [...order] });
+    persistColumnOrder(order);
   }
 }));

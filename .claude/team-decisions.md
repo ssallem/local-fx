@@ -161,9 +161,47 @@ Frame: [uint32 LE length][UTF-8 JSON body]  (Chrome Native Messaging 표준)
 - Ping hostMaxProtocolVersion 상수 `internal/version` 패키지 승격 (아직 ops 내부)
 
 ### 다음 단계 (후속 세션)
-- **Phase 2.2**: 컨텍스트 메뉴, 다중 선택(Shift/Ctrl+Click), 클립보드(Ctrl+C/X/V)
+- **Phase 2.2**: 컨텍스트 메뉴, ~~다중 선택(Shift/Ctrl+Click)~~ **사용자 결정으로 제외**, 클립보드(Ctrl+C/X/V)
 - **Phase 2.3**: 스트리밍 copy + 진행률 + 취소 + background.ts Event 라우팅 인프라
 - **Phase 2.4**: move + 충돌 3경로 + 부분 실패 요약 + 디렉터리 재귀
+
+## 미션 5 (2026-04-22): UI 품질 개선 — 헤더 정렬 + 컬럼 리사이즈/재정렬 + multi-select 제거
+- **원본 요청:** "헤더 name/size/modified 클릭 시 정렬, 헤더 컬럼 Width 조정과 이동, Multi 선택은 안돼"
+- **스크린샷 관찰:** C:\Windows 진입 성공, 툴바 "+ 새 폴더" 버튼 표시 확인, 드라이브 Sidebar 정상, 111 items 표시
+- **사용자 질의:** 다운로드 기능 유무 — 현재 없음, Phase 3+ 로드맵 후보로 기록
+
+### 작업 범위 (UI만)
+- **A) 헤더 정렬**: FileList 헤더(Name/Size/Modified) 클릭 시 asc↔desc 토글. 현재 field 표시(↑/↓ 인디케이터). Go readdir의 `sort: { field, order }` args 활용 — 서버 사이드 정렬.
+- **B) 컬럼 width 조정**: 헤더 셀 우측 경계에 리사이즈 핸들. mouse drag로 width 변경. 최소 width 보장. localStorage로 세션 간 보존(선택).
+- **C) 컬럼 순서 이동**: 헤더 셀 drag & drop으로 컬럼 순서 재정렬. localStorage 보존(선택).
+- **D) Multi-select 영구 제외**: Phase 2.2 계획에서 Shift+Click/Ctrl+Click/Ctrl+A 제거. single selection 영구 유지.
+
+### 추가 고려
+- `sort.field` Go 지원 값: "name"|"size"|"modified"|"type" (type은 UI에 헤더 없음, 일단 name/size/modified 3개)
+- 현재 `OpArgsMap.readdir` 에 `sort` 필드 이미 존재 — TS 타입 확장 불필요
+- store에 `sortField`, `sortOrder` 상태 추가 → navigate/reload 호출 시 args에 반영
+- store에 `columnWidths`, `columnOrder` 상태 추가 → localStorage 동기화
+- 제외: 다운로드 기능 (Phase 3+ 후보로 기록, 이번엔 구현 안 함)
+
+### 실행 결과
+- **[개발자 완료]** FileList 전면 재작성 (table→div grid), store에 sortField/sortOrder/columnWidths/columnOrder 상태 + setSort/setColumnWidth/setColumnOrder 액션 + localStorage 동기화. navigate/reload/loadMore 모두 sort args 주입. 플랜 파일 Phase 2.2에서 multi-select 제거.
+- **[Critic]** CRITICAL 2 + WARNING 6 + SUGGESTION 4 적발
+- **[수정 완료]** CRITICAL 전부 + WARNING 2 수정:
+  - M5-CRITICAL-1: `sanitizeWidth` 헬퍼로 NaN/음수/비정상 입력 방어, `setColumnWidth`에도 guard 적용 → localStorage 훼손 시 기본값 fallback
+  - M5-CRITICAL-2: window-level `dragend`/`drop`/`mouseup` cleanup 리스너로 stale dragCol 보장 정리 (ESC/window-outside drop 취소 대응)
+  - M5-WARNING-1: `persistColumnWidthsDebounced` (300ms) — 리사이즈 mousemove I/O 폭증 제거
+  - M5-WARNING-2: `reorderColumns(from, to, side)` 시그니처로 "after" drop 올바르게 처리 → 시각 힌트와 실제 결과 일치
+- **재검증**: `tsc --noEmit` PASS, `vite build` 171.05 KB (59 modules, 546ms)
+
+### 후속 플래그 (이번에 손대지 않음)
+- Name 셀 단일 클릭 → openEntry (기존 Phase 2.1 이슈, Phase 2.2 컨텍스트 메뉴에서 정리)
+- 헤더 접근성 `aria-sort` / `role="columnheader"` 누락
+- Firefox `text/x-column` MIME 호환성 (확장은 Chrome 전용이라 영향 무)
+- `col-name` CSS 클래스 미정의 (현재 무해)
+- columnWidths 새로고침 직전 300ms 내 저장 누락 가능성 (immediate flush 미배선)
+- `sortField="type"` UI 미노출 (헤더 컬럼에 type 없음)
+- "unsorted" 상태 미지원 (asc↔desc 토글만)
+- 다운로드 기능 (Phase 3+ 로드맵 후보)
 - **[Phase 6 Round 2 — 신규 CRITICAL 수정 (개발자 8)]**
   - N-1: TS `ErrorCode` 유니온에 `E_UNKNOWN_OP`/`E_BAD_REQUEST`/`E_INTERNAL` 3개 추가 → 총 22개(§8 20 + transport-local 2)
   - N-1: PROTOCOL.md §8에 3개 행 + 서두 총개수 20 명시

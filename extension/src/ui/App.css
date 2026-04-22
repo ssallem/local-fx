@@ -282,6 +282,7 @@ button:disabled {
 .filelist {
   overflow: auto;
   min-height: 0;
+  font-size: 13px;
 }
 
 .filelist-empty {
@@ -290,46 +291,89 @@ button:disabled {
   color: var(--fg-muted);
 }
 
-.filelist-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.filelist-table thead {
+/* Header row uses grid so the column template can be driven at runtime by
+   store.columnWidths. Sticky keeps it visible on scroll. */
+.filelist-head {
+  display: grid;
   position: sticky;
   top: 0;
   background: var(--header-bg);
-  z-index: 1;
-}
-
-.filelist-table th {
-  text-align: left;
-  font-weight: 600;
-  padding: 6px 12px;
   border-bottom: 1px solid var(--border);
-  color: var(--fg-muted);
+  z-index: 1;
   user-select: none;
 }
 
-.col-name { width: auto; }
-.col-size { width: 120px; text-align: right; }
-.col-modified { width: 200px; }
-
-.filelist-row {
-  cursor: default;
+.filelist-header {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  color: var(--fg-muted);
+  font-weight: 600;
 }
 
-.filelist-row td {
-  padding: 4px 12px;
-  border-bottom: 1px solid transparent;
+.filelist-header-button {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 0;
 }
 
-.filelist-row .col-size { text-align: right; }
+.filelist-header-button:hover {
+  background: var(--row-hover);
+}
+
+.filelist-header-active .filelist-header-button {
+  color: var(--fg);
+}
+
+.filelist-header-resizer {
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+.filelist-header-resizer:hover,
+.filelist-header-resizer:active {
+  background: var(--accent);
+  opacity: 0.35;
+}
+
+/* Drop indicators when drag-reordering columns. */
+.filelist-header.drop-before::before,
+.filelist-header.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+.filelist-header.drop-before::before { left: 0; }
+.filelist-header.drop-after::after { right: 0; }
+
+.filelist-body {
+  display: block;
+}
+
+.filelist-row {
+  display: grid;
+  align-items: center;
+  cursor: default;
+  border-bottom: 1px solid transparent;
+}
 
 .filelist-row:hover {
   background: var(--row-hover);
@@ -342,6 +386,16 @@ button:disabled {
 .filelist-row-hidden {
   opacity: 0.5;
 }
+
+.filelist-cell {
+  padding: 4px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.col-size { text-align: right; }
 
 .filelist-name {
   display: inline-flex;
