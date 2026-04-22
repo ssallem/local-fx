@@ -1,0 +1,29 @@
+{
+  "name": "local-explorer-extension",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Chrome MV3 extension that browses local files via a Native Messaging Host.",
+  "scripts": {
+    "dev": "vite",
+    "prebuild": "node scripts/check-manifest-key.cjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "zip": "powershell -NoProfile -Command \"Compress-Archive -Path dist\\* -DestinationPath local-explorer.zip -Force\""
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/node": "^22.7.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-plugin-static-copy": "^2.0.0"
+  }
+}

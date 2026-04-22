@@ -14,17 +14,25 @@ build/
 *.dylib
 /native-host/bin/
 
-# Editor / OS
+# Editor / OS / tooling
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+.serena/
+.claude/settings.local.json
 
 # Env / secrets
 .env
 .env.local
 *.key
 *.pem
+
+# Dev-only extension signing key (see installer/shared/generate-dev-key.*)
+/extension/dev-key/
+
+# Installer dev logs
+/installer/*/logs/
 
 # Logs
 *.log

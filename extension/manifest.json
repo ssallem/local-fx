@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Local Explorer",
+  "version": "0.0.1",
+  "description": "Browse local drives and files from a Chrome tab.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["nativeMessaging", "alarms"],
+  "chrome_url_overrides": {
+    "newtab": "tab.html"
+  },
+  "action": {
+    "default_title": "Local Explorer"
+  }
+}

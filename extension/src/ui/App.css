@@ -1,0 +1,514 @@
+/* -------------------------------------------------------------------------
+   Local Explorer — global styles
+   - system fonts, CSS Grid layout
+   - auto dark/light via prefers-color-scheme
+   - single file on purpose (Phase 1); split if it grows past ~400 lines
+   ------------------------------------------------------------------------- */
+
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --fg-muted: #555555;
+  --border: #dddddd;
+  --border-strong: #bbbbbb;
+  --accent: #0066cc;
+  --accent-fg: #ffffff;
+  --row-hover: #f4f7fb;
+  --row-selected: #d9ebfd;
+  --header-bg: #f6f7f9;
+  --error-bg: #fdecea;
+  --error-fg: #7a1c12;
+  --error-border: #f5b5ad;
+  --warn-bg: #fff8e1;
+  --warn-fg: #7a5a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e1e;
+    --fg: #dddddd;
+    --fg-muted: #999999;
+    --border: #333333;
+    --border-strong: #555555;
+    --accent: #4ea3ff;
+    --accent-fg: #0d1b2a;
+    --row-hover: #2a2a2a;
+    --row-selected: #2f4a6a;
+    --header-bg: #262626;
+    --error-bg: #3a1c18;
+    --error-fg: #ffb5ab;
+    --error-border: #6a2a20;
+    --warn-bg: #3a2f10;
+    --warn-fg: #ffd88a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------ App shell */
+
+.app {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  height: 100vh;
+}
+
+/* ------------------------------------------------------------ Toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-buttons button {
+  min-width: 28px;
+  padding: 2px 8px;
+  font-size: 14px;
+}
+
+.toolbar-spacer { flex: 1; }
+
+.toolbar-dev {
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------ Breadcrumb */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.breadcrumb-home,
+.breadcrumb-link {
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.breadcrumb-home:hover,
+.breadcrumb-link:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.breadcrumb-link:disabled {
+  color: var(--fg);
+  opacity: 1;
+  cursor: default;
+  font-weight: 600;
+}
+
+.breadcrumb-sep {
+  color: var(--fg-muted);
+  padding: 0 2px;
+}
+
+/* ------------------------------------------------------------ Main grid */
+
+.main {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-home {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 40px;
+}
+
+/* ------------------------------------------------------------ Sidebar */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  gap: 4px;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.sidebar-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  padding: 6px 8px 2px;
+}
+
+.sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-empty {
+  color: var(--fg-muted);
+  padding: 6px 10px;
+  font-style: italic;
+}
+
+.drive-row {
+  display: block;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.drive-row:hover {
+  background: var(--row-hover);
+}
+
+.drive-row-active {
+  background: var(--row-selected);
+  border-color: var(--border-strong);
+}
+
+.drive-row-label {
+  font-weight: 500;
+}
+
+.drive-row-meta {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------ Home grid */
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 960px;
+}
+
+.home-drive-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--header-bg);
+  border-radius: 8px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.home-drive-card:hover {
+  background: var(--row-hover);
+  border-color: var(--border-strong);
+}
+
+.home-drive-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.home-drive-meta {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.home-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* ------------------------------------------------------------ File list */
+
+.filelist {
+  overflow: auto;
+  min-height: 0;
+}
+
+.filelist-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+.filelist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.filelist-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--header-bg);
+  z-index: 1;
+}
+
+.filelist-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+  user-select: none;
+}
+
+.col-name { width: auto; }
+.col-size { width: 120px; text-align: right; }
+.col-modified { width: 200px; }
+
+.filelist-row {
+  cursor: default;
+}
+
+.filelist-row td {
+  padding: 4px 12px;
+  border-bottom: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0;
+}
+
+.filelist-row .col-size { text-align: right; }
+
+.filelist-row:hover {
+  background: var(--row-hover);
+}
+
+.filelist-row-selected {
+  background: var(--row-selected);
+}
+
+.filelist-row-hidden {
+  opacity: 0.5;
+}
+
+.filelist-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filelist-name:hover {
+  text-decoration: underline;
+}
+
+.filelist-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.filelist-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filelist-ro {
+  font-size: 10px;
+  color: var(--fg-muted);
+}
+
+.filelist-row-dir .filelist-label { font-weight: 500; }
+
+/* ------------------------------------------------------------ Status bar */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--header-bg);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.statusbar-loadmore {
+  padding: 2px 10px;
+}
+
+.statusbar-warn {
+  color: var(--warn-fg);
+  background: var(--warn-bg);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------ Error banner */
+
+.error-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 12px 0;
+  padding: 10px 14px;
+  background: var(--error-bg);
+  color: var(--error-fg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+}
+
+.error-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.error-banner-code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.error-banner-msg {
+  opacity: 0.9;
+}
+
+.error-banner-tag {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+  align-self: flex-start;
+}
+
+.error-banner-hint {
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.error-banner-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.error-banner-actions button {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--error-border);
+  color: inherit;
+}
+
+/* ------------------------------------------------------------ Dev panel */
+
+.devpanel {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  width: 360px;
+  max-height: 60vh;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.devpanel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  border-radius: 8px 8px 0 0;
+}
+
+.devpanel-body {
+  padding: 12px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.devpanel-pre {
+  margin: 0;
+  padding: 10px;
+  background: var(--header-bg);
+  border-radius: 4px;
+  font-size: 12px;
+  overflow: auto;
+  max-height: 280px;
+}
+
+.devpanel-err {
+  padding: 10px;
+  background: var(--error-bg);
+  color: var(--error-fg);
+  border: 1px solid var(--error-border);
+  border-radius: 4px;
+}

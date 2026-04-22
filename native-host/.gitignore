@@ -1,0 +1,12 @@
+# Build artifacts
+bin/
+*.exe
+
+# Go test/coverage
+*.test
+*.out
+coverage.*
+
+# Editor
+.idea/
+.vscode/
