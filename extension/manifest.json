@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "description": "브라우저 새 탭에서 로컬 드라이브와 파일을 탐색·조작할 수 있는 확장. Native Messaging Host를 통해 Windows/macOS 파일 시스템과 통신. (Requires Native Host installation)",
   "author": "LocalFx",
-  "homepage_url": "https://github.com/example/local-fx",
+  "homepage_url": "https://github.com/ssallem/local-fx",
   "minimum_chrome_version": "116",
   "background": {
     "service_worker": "background.js",

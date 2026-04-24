@@ -22,7 +22,7 @@ GitHub Releases로 Native Host 바이너리 + 설치 스크립트 배포:
 
 > This extension requires a local Native Messaging Host application.
 > After installing the extension, download and run the installer from:
-> https://github.com/example/local-fx/releases
+> https://github.com/ssallem/local-fx/releases
 
 또는 확장이 첫 실행 시 Host 미등록 감지(`E_HOST_NOT_FOUND`) → UI에 다운로드 링크 표시. 현재 구현의 ErrorBanner가 `details.mayNeedInstall` 플래그로 표시.
 
