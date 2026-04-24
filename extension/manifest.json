@@ -3,7 +3,7 @@
   "name": "Tab Explorer: File Manager in a New Tab",
   "short_name": "Tab Explorer",
   "version": "0.2.0",
-  "description": "Open a new tab and get a complete file manager — browse drives, copy/move/rename/trash files, resolve conflicts, track progress. Not a link handler — a full explorer UI inside your browser tab. Requires a free Native Host install (Windows / macOS).",
+  "description": "Open a new tab, get a file manager. Browse local drives, copy, move, rename, and trash — all in Chrome. Native Host required.",
   "author": "LocalFx",
   "homepage_url": "https://github.com/ssallem/local-fx",
   "minimum_chrome_version": "116",
