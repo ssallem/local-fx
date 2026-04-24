@@ -12,6 +12,7 @@
 import { useEffect } from "react";
 import { useJobs, type Job } from "../store/jobs";
 import { formatBytes } from "../utils/format";
+import { t } from "../utils/i18n";
 
 const AUTO_DISMISS_MS = 3000;
 
@@ -84,17 +85,19 @@ function JobCard({ job }: { job: Job }): JSX.Element {
       stateLabel = `${pct}%`;
       break;
     case "canceling":
-      stateLabel = "취소 중...";
+      stateLabel = t("toast_canceling");
       break;
     case "done":
-      stateLabel = "완료";
+      stateLabel = t("toast_done");
       break;
     case "canceled":
-      stateLabel = "취소됨";
+      stateLabel = t("toast_canceled");
       break;
     case "failed":
       stateLabel =
-        job.failures.length > 0 ? `${job.failures.length}건 실패` : "실패";
+        job.failures.length > 0
+          ? t("toast_failed_count", [job.failures.length])
+          : t("toast_failed");
       break;
   }
 
@@ -107,7 +110,8 @@ function JobCard({ job }: { job: Job }): JSX.Element {
     <div className={`progress-toast state-${job.state}`}>
       <div className="progress-toast-header">
         <span className="progress-toast-label" title={job.label}>
-          {job.kind === "copy" ? "복사" : "이동"}: {job.label}
+          {job.kind === "copy" ? t("toast_kind_copy") : t("toast_kind_move")}:{" "}
+          {job.label}
         </span>
         <span className="progress-toast-state">{stateLabel}</span>
         {isTerminal && (
@@ -115,7 +119,7 @@ function JobCard({ job }: { job: Job }): JSX.Element {
             type="button"
             className="progress-toast-close"
             onClick={() => removeJob(job.id)}
-            aria-label="닫기"
+            aria-label={t("common_close")}
           >
             ×
           </button>
@@ -142,7 +146,7 @@ function JobCard({ job }: { job: Job }): JSX.Element {
             </span>
             {job.fileTotal > 1 && (
               <span>
-                파일 {job.fileDone}/{job.fileTotal}
+                {t("toast_file_progress", [job.fileDone, job.fileTotal])}
               </span>
             )}
             {job.rate !== undefined && job.rate > 0 && (
@@ -162,7 +166,7 @@ function JobCard({ job }: { job: Job }): JSX.Element {
                 void onCancel();
               }}
             >
-              취소
+              {t("toast_cancel_button")}
             </button>
           )}
         </div>
@@ -175,7 +179,9 @@ function JobCard({ job }: { job: Job }): JSX.Element {
       {(job.state === "failed" || job.state === "done") &&
         job.failures.length > 0 && (
           <details className="progress-toast-failures">
-            <summary>{job.failures.length}건 실패</summary>
+            <summary>
+              {t("toast_failures_summary", [job.failures.length])}
+            </summary>
             <ul>
               {job.failures.slice(0, 10).map((f, i) => (
                 <li key={i}>
@@ -183,7 +189,7 @@ function JobCard({ job }: { job: Job }): JSX.Element {
                 </li>
               ))}
               {job.failures.length > 10 && (
-                <li>... +{job.failures.length - 10}</li>
+                <li>{t("toast_failures_more", [job.failures.length - 10])}</li>
               )}
             </ul>
           </details>

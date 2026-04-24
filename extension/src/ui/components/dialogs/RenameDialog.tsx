@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { t } from "../../utils/i18n";
 
 interface Props {
   initialName: string;
@@ -21,11 +22,11 @@ const FORBIDDEN = /[\\/:*?"<>|]/;
 const CONTROL_CHARS = /[\x00-\x1F]/;
 
 function validate(name: string): string | null {
-  if (name.length === 0) return "이름을 입력하세요";
-  if (name !== name.trim()) return "앞뒤 공백은 사용할 수 없습니다";
-  if (FORBIDDEN.test(name)) return "\\ / : * ? \" < > | 는 사용할 수 없습니다";
-  if (CONTROL_CHARS.test(name)) return "제어 문자(개행/탭 등)는 사용할 수 없습니다";
-  if (name === "." || name === "..") return "'.' 또는 '..'는 사용할 수 없습니다";
+  if (name.length === 0) return t("dialog_rename_validation_empty");
+  if (name !== name.trim()) return t("dialog_rename_validation_whitespace");
+  if (FORBIDDEN.test(name)) return t("dialog_rename_validation_forbidden");
+  if (CONTROL_CHARS.test(name)) return t("dialog_rename_validation_control");
+  if (name === "." || name === "..") return t("dialog_rename_validation_dot");
   return null;
 }
 
@@ -36,13 +37,16 @@ function validate(name: string): string | null {
  */
 export function RenameDialog({
   initialName,
-  title = "이름",
-  confirmLabel = "확인",
+  title,
+  confirmLabel,
   onConfirm,
   onCancel
 }: Props): JSX.Element {
   const [name, setName] = useState(initialName);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Resolve i18n defaults at render time — see ConfirmDialog for rationale.
+  const resolvedTitle = title ?? t("dialog_rename_title");
+  const resolvedConfirmLabel = confirmLabel ?? t("common_ok");
 
   const error = useMemo(() => validate(name), [name]);
   const canSubmit = error === null;
@@ -88,7 +92,7 @@ export function RenameDialog({
       }}
     >
       <div className="dialog">
-        <h2 id="rename-dialog-title">{title}</h2>
+        <h2 id="rename-dialog-title">{resolvedTitle}</h2>
         <input
           ref={inputRef}
           type="text"
@@ -106,10 +110,10 @@ export function RenameDialog({
         )}
         <div className="dialog-buttons">
           <button type="button" onClick={onCancel}>
-            취소
+            {t("common_cancel")}
           </button>
           <button type="button" onClick={submit} disabled={!canSubmit}>
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

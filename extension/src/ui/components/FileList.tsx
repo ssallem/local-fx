@@ -7,6 +7,7 @@ import {
 } from "../store/explorer";
 import { useClipboard } from "../store/clipboard";
 import { formatBytes, formatTime } from "../utils/format";
+import { t } from "../utils/i18n";
 
 /**
  * FileList — 3-column virtualised-ish listing.
@@ -24,10 +25,14 @@ import { formatBytes, formatTime } from "../utils/format";
  * auto` which makes pixel-accurate width control awkward.
  */
 
-const COLUMN_LABELS: Record<SortableField, string> = {
-  name: "Name",
-  size: "Size",
-  modified: "Modified"
+// Column labels are looked up lazily (per-render inside the header) so a
+// runtime locale switch — though Chrome doesn't support it today — would pick
+// up the new translation without module-load baked values. The map keys still
+// encode which i18n key each column uses.
+const COLUMN_LABEL_KEYS: Record<SortableField, string> = {
+  name: "filelist_col_name",
+  size: "filelist_col_size",
+  modified: "filelist_col_modified"
 };
 
 const MIN_WIDTHS: Record<SortableField, number> = {
@@ -303,7 +308,7 @@ export function FileList({
   if (loading && entries.length === 0) {
     return (
       <div className="filelist" onContextMenu={onBlankContextMenu}>
-        <div className="filelist-empty">Loading…</div>
+        <div className="filelist-empty">{t("filelist_loading")}</div>
       </div>
     );
   }
@@ -311,7 +316,7 @@ export function FileList({
   if (currentPath !== null && entries.length === 0) {
     return (
       <div className="filelist" onContextMenu={onBlankContextMenu}>
-        <div className="filelist-empty">Empty directory</div>
+        <div className="filelist-empty">{t("filelist_empty")}</div>
       </div>
     );
   }
@@ -351,7 +356,7 @@ export function FileList({
             <span className="filelist-icon">{iconFor(entry)}</span>
             <span className="filelist-label">{entry.name}</span>
             {entry.readOnly ? (
-              <span className="filelist-ro" title="read-only">
+              <span className="filelist-ro" title={t("filelist_read_only")}>
                 🔒
               </span>
             ) : null}
@@ -410,7 +415,7 @@ export function FileList({
                 className="filelist-header-button"
                 onClick={() => handleHeaderClick(col)}
               >
-                {COLUMN_LABELS[col]}
+                {t(COLUMN_LABEL_KEYS[col])}
                 {indicator}
               </button>
               <div

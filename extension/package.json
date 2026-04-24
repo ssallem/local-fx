@@ -1,7 +1,7 @@
 {
   "name": "local-explorer-extension",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Chrome MV3 extension that browses local files via a Native Messaging Host.",
   "scripts": {

@@ -26,6 +26,7 @@ import {
 } from "./components/dialogs";
 import { ProgressToasts } from "./components/ProgressToasts";
 import { basename, formatBytes, joinPath } from "./utils/format";
+import { t } from "./utils/i18n";
 import { IpcError, stat as ipcStat } from "./ipc";
 import type {
   CopyArgs,
@@ -46,39 +47,47 @@ function HomeScreen(): JSX.Element {
   const loading = useExplorerStore((s) => s.loading);
 
   if (loading && drives.length === 0) {
-    return <div className="home-title">Loading drives…</div>;
+    return <div className="home-title">{t("app_loading_drives")}</div>;
   }
 
   return (
     <div style={{ width: "100%", maxWidth: 960 }}>
-      <div className="home-title">Local Explorer</div>
+      <div className="home-title">{t("app_home_title")}</div>
       <div className="home-grid">
         {drives.length === 0 ? (
-          <div className="sidebar-empty">
-            No drives detected. Open the dev panel (⚙) to ping the host.
-          </div>
+          <div className="sidebar-empty">{t("app_no_drives_hint")}</div>
         ) : (
-          drives.map((d: Drive) => (
-            <button
-              key={d.path}
-              type="button"
-              className="home-drive-card"
-              onClick={() => {
-                void navigate(d.path);
-              }}
-            >
-              <div className="home-drive-title">
-                💽 {d.label ? `${d.label} (${d.path})` : d.path}
-              </div>
-              <div className="home-drive-meta">
-                {d.fsType}
-                {d.totalBytes > 0
-                  ? ` • ${formatBytes(d.freeBytes)} free / ${formatBytes(d.totalBytes)}`
-                  : ""}
-                {d.readOnly ? " • read-only" : ""}
-              </div>
-            </button>
-          ))
+          drives.map((d: Drive) => {
+            // Build the drive meta line piecewise so translators get complete
+            // sentences for capacity / read-only and the `•` separators stay
+            // locale-agnostic glue.
+            const capacity =
+              d.totalBytes > 0
+                ? ` • ${t("app_drive_capacity", [formatBytes(d.freeBytes), formatBytes(d.totalBytes)])}`
+                : "";
+            const roSuffix = d.readOnly
+              ? ` • ${t("app_drive_read_only_suffix")}`
+              : "";
+            return (
+              <button
+                key={d.path}
+                type="button"
+                className="home-drive-card"
+                onClick={() => {
+                  void navigate(d.path);
+                }}
+              >
+                <div className="home-drive-title">
+                  💽 {d.label ? `${d.label} (${d.path})` : d.path}
+                </div>
+                <div className="home-drive-meta">
+                  {d.fsType}
+                  {capacity}
+                  {roSuffix}
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
     </div>
@@ -195,8 +204,8 @@ export function App(): JSX.Element {
   const openCreateFolder = useCallback(() => {
     setRenameDialog({
       mode: "create",
-      initialName: "새 폴더",
-      title: "새 폴더 만들기"
+      initialName: t("dialog_rename_default_name_new_folder"),
+      title: t("dialog_rename_title_new_folder")
     });
   }, []);
 
@@ -389,7 +398,10 @@ export function App(): JSX.Element {
         // and is a reasonable proxy for "how many things did we attempt".
         setFailureSummary({
           jobId: id,
-          title: j.kind === "copy" ? "복사 결과" : "이동 결과",
+          title:
+            j.kind === "copy"
+              ? t("toast_result_copy_title")
+              : t("toast_result_move_title"),
           totalAttempted: Math.max(j.fileTotal, j.failures.length),
           failures: j.failures
         });
@@ -523,7 +535,7 @@ export function App(): JSX.Element {
           mode: "rename",
           path: primaryEntry.path,
           initialName: primaryEntry.name,
-          title: "이름 변경"
+          title: t("dialog_rename_title_rename")
         });
         return;
       }
@@ -625,7 +637,10 @@ export function App(): JSX.Element {
     const canPaste = clipboardMode !== null && currentPath !== null;
     return [
       {
-        label: entry.type === "directory" ? "열기" : "기본 앱으로 열기",
+        label:
+          entry.type === "directory"
+            ? t("context_open")
+            : t("context_open_default"),
         shortcut: "Enter",
         onClick: () => {
           if (entry.type === "directory") {
@@ -636,24 +651,24 @@ export function App(): JSX.Element {
         }
       },
       {
-        label: "탐색기에서 보기",
+        label: t("context_reveal"),
         onClick: () => {
           void revealEntry(entry.path);
         }
       },
       { label: "", separator: true, onClick: () => {} },
       {
-        label: "복사",
+        label: t("context_copy"),
         shortcut: "Ctrl+C",
         onClick: () => setClipboardFromSelection("copy")
       },
       {
-        label: "잘라내기",
+        label: t("context_cut"),
         shortcut: "Ctrl+X",
         onClick: () => setClipboardFromSelection("cut")
       },
       {
-        label: "붙여넣기",
+        label: t("context_paste"),
         shortcut: "Ctrl+V",
         disabled: !canPaste,
         onClick: () => {
@@ -662,25 +677,25 @@ export function App(): JSX.Element {
       },
       { label: "", separator: true, onClick: () => {} },
       {
-        label: "이름 변경",
+        label: t("context_rename"),
         shortcut: "F2",
         onClick: () =>
           setRenameDialog({
             mode: "rename",
             path: entry.path,
             initialName: entry.name,
-            title: "이름 변경"
+            title: t("dialog_rename_title_rename")
           })
       },
       {
-        label: "삭제(휴지통)",
+        label: t("context_trash"),
         shortcut: "Del",
         danger: true,
         onClick: () =>
           setDeleteConfirm({ path: entry.path, mode: "trash" })
       },
       {
-        label: "영구 삭제",
+        label: t("context_permanent_delete"),
         shortcut: "Shift+Del",
         danger: true,
         onClick: () =>
@@ -696,13 +711,13 @@ export function App(): JSX.Element {
     const canPaste = clipboardMode !== null && currentPath !== null;
     return [
       {
-        label: "+ 새 폴더",
+        label: t("context_new_folder"),
         disabled: currentPath === null,
         onClick: openCreateFolder
       },
       { label: "", separator: true, onClick: () => {} },
       {
-        label: "붙여넣기",
+        label: t("context_paste"),
         shortcut: "Ctrl+V",
         disabled: !canPaste,
         onClick: () => {
@@ -710,7 +725,7 @@ export function App(): JSX.Element {
         }
       },
       {
-        label: "새로 고침",
+        label: t("context_refresh"),
         shortcut: "F5",
         onClick: () => {
           void reload();
@@ -753,8 +768,8 @@ export function App(): JSX.Element {
           variant={
             pendingConfirm.kind === "system-path" ? "warning" : "danger"
           }
-          confirmLabel="계속"
-          cancelLabel="취소"
+          confirmLabel={t("common_continue")}
+          cancelLabel={t("common_cancel")}
           onConfirm={() => {
             void resolvePendingConfirm();
           }}
@@ -836,7 +851,10 @@ export function App(): JSX.Element {
               shownFailuresRef.current.add(id);
               setFailureSummary({
                 jobId: id,
-                title: j.kind === "copy" ? "복사 결과" : "이동 결과",
+                title:
+                  j.kind === "copy"
+                    ? t("toast_result_copy_title")
+                    : t("toast_result_move_title"),
                 totalAttempted: Math.max(j.fileTotal, j.failures.length),
                 failures: j.failures
               });
@@ -850,21 +868,25 @@ export function App(): JSX.Element {
         <ConfirmDialog
           title={
             deleteConfirm.mode === "permanent"
-              ? "영구 삭제"
-              : "휴지통으로 이동"
+              ? t("dialog_delete_title_permanent")
+              : t("dialog_delete_title_trash")
           }
           message={
             deleteConfirm.mode === "permanent"
-              ? `'${basename(deleteConfirm.path)}'를 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.`
-              : `'${basename(deleteConfirm.path)}'를 휴지통으로 이동합니다.`
+              ? t("dialog_delete_message_permanent", [
+                  basename(deleteConfirm.path)
+                ])
+              : t("dialog_delete_message_trash", [
+                  basename(deleteConfirm.path)
+                ])
           }
           variant="danger"
           confirmLabel={
             deleteConfirm.mode === "permanent"
-              ? "영구 삭제"
-              : "휴지통으로 이동"
+              ? t("dialog_delete_title_permanent")
+              : t("dialog_delete_title_trash")
           }
-          cancelLabel="취소"
+          cancelLabel={t("common_cancel")}
           onConfirm={() => {
             void deleteEntry(deleteConfirm.path, deleteConfirm.mode);
             setDeleteConfirm(null);

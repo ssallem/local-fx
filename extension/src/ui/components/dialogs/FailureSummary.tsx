@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { FailureInfo } from "../../../types/shared";
+import { t } from "../../utils/i18n";
 
 /**
  * Phase 2.4 — terminal-state results modal for streaming copy/move jobs.
@@ -70,15 +71,15 @@ export function FailureSummary({
       >
         <h2 id="failure-summary-title">{title}</h2>
         <p className="dialog-message">
-          성공: {successCount}건 · 실패: {failures.length}건
+          {t("dialog_failure_summary_stats", [successCount, failures.length])}
         </p>
         <div className="failure-list">
           <table>
             <thead>
               <tr>
-                <th>경로</th>
-                <th>코드</th>
-                <th>메시지</th>
+                <th>{t("dialog_failure_col_path")}</th>
+                <th>{t("dialog_failure_col_code")}</th>
+                <th>{t("dialog_failure_col_message")}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,7 +100,7 @@ export function FailureSummary({
         </div>
         <div className="dialog-buttons">
           <button ref={okBtnRef} type="button" onClick={onClose}>
-            확인
+            {t("common_ok")}
           </button>
         </div>
       </div>

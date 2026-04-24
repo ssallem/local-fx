@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { t } from "../../utils/i18n";
 
 export type ConfirmVariant = "default" | "danger" | "warning";
 
@@ -27,11 +28,16 @@ export function ConfirmDialog({
   title,
   message,
   variant = "default",
-  confirmLabel = "확인",
-  cancelLabel = "취소",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel
 }: Props): JSX.Element {
+  // Defaults are resolved at render time (not in the destructuring) so they
+  // pick up the active locale every invocation. Module-load-time evaluation
+  // would freeze the first-seen translation.
+  const resolvedConfirmLabel = confirmLabel ?? t("common_ok");
+  const resolvedCancelLabel = cancelLabel ?? t("common_cancel");
   const confirmBtnRef = useRef<HTMLButtonElement | null>(null);
   const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
 
@@ -95,7 +101,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             ref={confirmBtnRef}
@@ -103,7 +109,7 @@ export function ConfirmDialog({
             className={confirmClass}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </div>
       </div>

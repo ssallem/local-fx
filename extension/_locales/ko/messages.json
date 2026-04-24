@@ -10,5 +10,560 @@
   "appDescription": {
     "message": "새 탭이 곧 파일 탐색기. 로컬 드라이브 탐색, 복사·이동·이름 변경·휴지통까지 Chrome 안에서. Native Host 설치 필요.",
     "description": "Web Store short description (max 132 chars)."
+  },
+
+  "common_ok": {
+    "message": "확인",
+    "description": "Default confirm button label."
+  },
+  "common_cancel": {
+    "message": "취소",
+    "description": "Default cancel button label."
+  },
+  "common_close": {
+    "message": "닫기",
+    "description": "aria-label / tooltip for close (×) buttons."
+  },
+  "common_continue": {
+    "message": "계속",
+    "description": "Confirm button for system-path pending confirms."
+  },
+  "common_retry": {
+    "message": "다시 시도",
+    "description": "Button that re-runs the last failed operation."
+  },
+  "common_dismiss": {
+    "message": "닫기",
+    "description": "Button that hides an error banner without retrying."
+  },
+  "common_loading": {
+    "message": "불러오는 중…",
+    "description": "Generic loading placeholder."
+  },
+  "common_read_only": {
+    "message": "읽기 전용",
+    "description": "Tag shown next to a read-only drive or file."
+  },
+
+  "app_home_title": {
+    "message": "로컬 탐색기",
+    "description": "Heading on the drive-list home screen."
+  },
+  "app_loading_drives": {
+    "message": "드라이브 불러오는 중…",
+    "description": "Home-screen placeholder while drives are being enumerated."
+  },
+  "app_no_drives_hint": {
+    "message": "드라이브를 찾을 수 없습니다. 개발 패널(⚙)을 열어 호스트 연결을 확인하세요.",
+    "description": "Help text shown on the home screen when the Native Host returned zero drives."
+  },
+  "app_drive_capacity": {
+    "message": "$free$ 사용 가능 / $total$",
+    "description": "Drive capacity meta line, e.g. '12 GB 사용 가능 / 500 GB'.",
+    "placeholders": {
+      "free": { "content": "$1", "example": "12 GB" },
+      "total": { "content": "$2", "example": "500 GB" }
+    }
+  },
+  "app_drive_read_only_suffix": {
+    "message": "읽기 전용",
+    "description": "Appears after the capacity line when a drive is mounted read-only."
+  },
+
+  "toolbar_back": {
+    "message": "뒤로",
+    "description": "Toolbar back button aria-label."
+  },
+  "toolbar_back_title": {
+    "message": "뒤로 (Alt+←)",
+    "description": "Tooltip for the back button."
+  },
+  "toolbar_forward": {
+    "message": "앞으로",
+    "description": "Toolbar forward button aria-label."
+  },
+  "toolbar_forward_title": {
+    "message": "앞으로 (Alt+→)",
+    "description": "Tooltip for the forward button."
+  },
+  "toolbar_up": {
+    "message": "상위 폴더",
+    "description": "Toolbar 'go up one level' aria-label."
+  },
+  "toolbar_up_title": {
+    "message": "상위 폴더 (Backspace)",
+    "description": "Tooltip for the up-directory button."
+  },
+  "toolbar_reload": {
+    "message": "새로 고침",
+    "description": "Toolbar reload aria-label."
+  },
+  "toolbar_reload_title": {
+    "message": "새로 고침 (F5)",
+    "description": "Tooltip for the reload button."
+  },
+  "toolbar_new_folder": {
+    "message": "새 폴더",
+    "description": "Title/aria-label for the toolbar create-folder button."
+  },
+  "toolbar_new_folder_button": {
+    "message": "+ 새 폴더",
+    "description": "Visible label on the toolbar create-folder button."
+  },
+  "toolbar_dev_panel": {
+    "message": "개발 패널",
+    "description": "aria-label for the developer panel toggle."
+  },
+  "toolbar_dev_panel_title": {
+    "message": "개발 패널 (Ctrl+Shift+P)",
+    "description": "Tooltip for the developer panel toggle."
+  },
+
+  "breadcrumb_aria": {
+    "message": "경로",
+    "description": "aria-label for the breadcrumb navigation region."
+  },
+  "breadcrumb_drives": {
+    "message": "드라이브",
+    "description": "Leftmost breadcrumb that returns to the drive-list screen."
+  },
+
+  "sidebar_drives": {
+    "message": "드라이브",
+    "description": "Sidebar section title listing mounted drives."
+  },
+  "sidebar_no_drives": {
+    "message": "드라이브 없음",
+    "description": "Placeholder shown when no drives are available."
+  },
+  "sidebar_browse": {
+    "message": "바로 가기",
+    "description": "Sidebar section title for user shortcuts (future)."
+  },
+  "sidebar_browse_empty": {
+    "message": "(비어 있음)",
+    "description": "Placeholder shown when the Browse section has no shortcuts."
+  },
+
+  "filelist_col_name": {
+    "message": "이름",
+    "description": "File list column header — file name."
+  },
+  "filelist_col_size": {
+    "message": "크기",
+    "description": "File list column header — size."
+  },
+  "filelist_col_modified": {
+    "message": "수정 날짜",
+    "description": "File list column header — modified timestamp."
+  },
+  "filelist_loading": {
+    "message": "불러오는 중…",
+    "description": "File list placeholder while entries are loading."
+  },
+  "filelist_empty": {
+    "message": "빈 폴더",
+    "description": "File list placeholder when the current directory has no entries."
+  },
+  "filelist_read_only": {
+    "message": "읽기 전용",
+    "description": "Tooltip for the lock icon shown on read-only entries."
+  },
+
+  "statusbar_drives_count": {
+    "message": "드라이브 $count$개",
+    "description": "Status bar summary on the home screen.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "statusbar_items": {
+    "message": "$shown$ / $total$항목 · 페이지 $page$",
+    "description": "Status bar summary while browsing a directory.",
+    "placeholders": {
+      "shown": { "content": "$1", "example": "250" },
+      "total": { "content": "$2", "example": "1000" },
+      "page": { "content": "$3", "example": "1" }
+    }
+  },
+  "statusbar_selected": {
+    "message": "$count$개 선택됨",
+    "description": "Suffix appended to the item count when one or more rows are selected.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "5" }
+    }
+  },
+  "statusbar_load_more": {
+    "message": "더 불러오기",
+    "description": "Button that fetches the next page of directory entries."
+  },
+  "statusbar_large_dir": {
+    "message": "대용량 폴더($total$개 항목) — 성능이 저하될 수 있습니다. 가상 스크롤은 Phase 1.5에 도입 예정입니다.",
+    "description": "Warning shown when a directory exceeds the large-dir threshold.",
+    "placeholders": {
+      "total": { "content": "$1", "example": "12345" }
+    }
+  },
+
+  "error_retryable_tag": {
+    "message": "재시도 가능",
+    "description": "Small tag inside the error banner indicating the operation can be retried."
+  },
+  "error_hint_host_not_found": {
+    "message": "네이티브 호스트 'com.local.fx'를 찾지 못했습니다. 설치 프로그램을 실행하거나 NativeMessagingHosts 등록 상태를 확인하세요.",
+    "description": "Install hint shown when the extension cannot reach the Native Messaging host."
+  },
+  "error_hint_may_need_install": {
+    "message": "네이티브 호스트가 설치되어 있지 않거나 등록되지 않은 것 같습니다. 설치 프로그램을 실행하세요.",
+    "description": "Generic install hint shown when the host reports mayNeedInstall."
+  },
+  "error_cannot_create_at_home": {
+    "message": "홈 화면에서는 폴더를 만들 수 없습니다.",
+    "description": "Surfaced when createFolder is invoked while currentPath is null."
+  },
+  "error_cannot_rename_root": {
+    "message": "루트 경로는 이름을 변경할 수 없습니다.",
+    "description": "Surfaced when renameEntry is invoked on a drive/volume root."
+  },
+  "error_e_host_not_found": {
+    "message": "네이티브 호스트를 찾을 수 없습니다.",
+    "description": "Translated message for ErrorCode E_HOST_NOT_FOUND."
+  },
+  "error_e_host_crash": {
+    "message": "네이티브 호스트 연결이 끊어졌습니다.",
+    "description": "Translated message for ErrorCode E_HOST_CRASH."
+  },
+  "error_e_timeout": {
+    "message": "요청 시간이 초과되었습니다.",
+    "description": "Translated message for ErrorCode E_TIMEOUT."
+  },
+  "error_e_protocol": {
+    "message": "프로토콜 오류",
+    "description": "Translated message for ErrorCode E_PROTOCOL."
+  },
+  "error_e_bad_request": {
+    "message": "잘못된 요청입니다.",
+    "description": "Translated message for ErrorCode E_BAD_REQUEST."
+  },
+  "error_e_unknown": {
+    "message": "알 수 없는 오류입니다.",
+    "description": "Translated message for ErrorCode E_UNKNOWN."
+  },
+  "error_eacces": {
+    "message": "접근이 거부되었습니다.",
+    "description": "Translated message for ErrorCode EACCES."
+  },
+  "error_enoent": {
+    "message": "파일 또는 폴더가 없습니다.",
+    "description": "Translated message for ErrorCode ENOENT."
+  },
+  "error_enospc": {
+    "message": "디스크 공간이 부족합니다.",
+    "description": "Translated message for ErrorCode ENOSPC."
+  },
+  "error_ebusy": {
+    "message": "다른 앱에서 사용 중",
+    "description": "Translated message for ErrorCode EBUSY."
+  },
+  "error_einval": {
+    "message": "잘못된 인자입니다.",
+    "description": "Translated message for ErrorCode EINVAL."
+  },
+  "error_e_system_path_confirm_required": {
+    "message": "시스템 경로 확인이 필요합니다.",
+    "description": "Translated message for ErrorCode E_SYSTEM_PATH_CONFIRM_REQUIRED."
+  },
+
+  "devpanel_aria": {
+    "message": "개발자 패널",
+    "description": "aria-label for the slide-over dev panel."
+  },
+  "devpanel_title": {
+    "message": "개발 패널",
+    "description": "Heading inside the dev panel."
+  },
+  "devpanel_ping_host": {
+    "message": "호스트 Ping",
+    "description": "Button that sends a ping op to the Native Host."
+  },
+  "devpanel_pinging": {
+    "message": "Ping 중…",
+    "description": "Button state while a ping request is in flight."
+  },
+  "devpanel_retryable_suffix": {
+    "message": " (재시도 가능)",
+    "description": "Suffix appended to the dev panel error line when the op is retryable."
+  },
+
+  "context_open": {
+    "message": "열기",
+    "description": "Context menu — open a directory."
+  },
+  "context_open_default": {
+    "message": "기본 앱으로 열기",
+    "description": "Context menu — open a file with the OS default handler."
+  },
+  "context_reveal": {
+    "message": "탐색기에서 보기",
+    "description": "Context menu — show the entry in the OS file manager."
+  },
+  "context_copy": {
+    "message": "복사",
+    "description": "Context menu — copy selection to clipboard."
+  },
+  "context_cut": {
+    "message": "잘라내기",
+    "description": "Context menu — cut selection to clipboard."
+  },
+  "context_paste": {
+    "message": "붙여넣기",
+    "description": "Context menu — paste clipboard contents into the current directory."
+  },
+  "context_rename": {
+    "message": "이름 변경",
+    "description": "Context menu — rename the entry."
+  },
+  "context_trash": {
+    "message": "삭제(휴지통)",
+    "description": "Context menu — send the entry to the OS recycle bin / trash."
+  },
+  "context_permanent_delete": {
+    "message": "영구 삭제",
+    "description": "Context menu — delete the entry permanently."
+  },
+  "context_new_folder": {
+    "message": "+ 새 폴더",
+    "description": "Context menu — create a new folder in the current directory."
+  },
+  "context_refresh": {
+    "message": "새로 고침",
+    "description": "Context menu — re-read the current directory."
+  },
+
+  "dialog_rename_title": {
+    "message": "이름",
+    "description": "Default RenameDialog heading when no custom title is provided."
+  },
+  "dialog_rename_title_new_folder": {
+    "message": "새 폴더 만들기",
+    "description": "RenameDialog heading when creating a folder."
+  },
+  "dialog_rename_title_rename": {
+    "message": "이름 변경",
+    "description": "RenameDialog heading when renaming an entry."
+  },
+  "dialog_rename_default_name_new_folder": {
+    "message": "새 폴더",
+    "description": "Default suggested name pre-filled when creating a new folder."
+  },
+  "dialog_rename_validation_empty": {
+    "message": "이름을 입력하세요.",
+    "description": "Validation error: name field is empty."
+  },
+  "dialog_rename_validation_whitespace": {
+    "message": "앞뒤 공백은 사용할 수 없습니다.",
+    "description": "Validation error: name has outer whitespace."
+  },
+  "dialog_rename_validation_forbidden": {
+    "message": "\\ / : * ? \" < > | 는 사용할 수 없습니다.",
+    "description": "Validation error: name contains reserved characters."
+  },
+  "dialog_rename_validation_control": {
+    "message": "제어 문자(개행/탭 등)는 사용할 수 없습니다.",
+    "description": "Validation error: name contains C0 control characters."
+  },
+  "dialog_rename_validation_dot": {
+    "message": "'.' 또는 '..'는 사용할 수 없습니다.",
+    "description": "Validation error: name is '.' or '..'."
+  },
+
+  "dialog_delete_title_permanent": {
+    "message": "영구 삭제",
+    "description": "ConfirmDialog title for permanent delete."
+  },
+  "dialog_delete_title_trash": {
+    "message": "휴지통으로 이동",
+    "description": "ConfirmDialog title for trash/move-to-recycle-bin."
+  },
+  "dialog_delete_message_permanent": {
+    "message": "'$name$'를 영구 삭제합니다. 이 작업은 되돌릴 수 없습니다.",
+    "description": "ConfirmDialog body for permanent delete.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_delete_message_trash": {
+    "message": "'$name$'를 휴지통으로 이동합니다.",
+    "description": "ConfirmDialog body for trash move.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+
+  "system_path_confirm_title": {
+    "message": "시스템 경로 경고",
+    "description": "ConfirmDialog title when the host guards against writing to a system path."
+  },
+  "system_path_confirm_message": {
+    "message": "'$path$'는 시스템 경로입니다. 계속 진행하시겠습니까?",
+    "description": "ConfirmDialog body for a single-path system guard (mkdir/remove).",
+    "placeholders": {
+      "path": { "content": "$1", "example": "C:\\Windows\\System32" }
+    }
+  },
+  "system_path_confirm_message_rename": {
+    "message": "'$src$' 또는 '$dst$'는 시스템 경로입니다. 계속 진행하시겠습니까?",
+    "description": "ConfirmDialog body for a rename system guard (src OR dst may match).",
+    "placeholders": {
+      "src": { "content": "$1", "example": "C:\\Windows" },
+      "dst": { "content": "$2", "example": "C:\\Windows.bak" }
+    }
+  },
+
+  "dialog_conflict_title": {
+    "message": "대상 이름이 이미 존재합니다",
+    "description": "ConflictDialog title."
+  },
+  "dialog_conflict_remaining": {
+    "message": "남은 충돌 $count$건 — 선택을 일괄 적용하려면 아래 체크박스를 사용하세요.",
+    "description": "ConflictDialog hint when a batch has multiple conflicts.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "4" }
+    }
+  },
+  "dialog_conflict_message": {
+    "message": "'$name$' 파일/폴더가 대상 위치에 이미 있습니다. 어떻게 처리할까요?",
+    "description": "ConflictDialog body.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_src_header": {
+    "message": "원본 ($name$)",
+    "description": "ConflictDialog left-side comparison heading.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_dst_header": {
+    "message": "대상 ($name$)",
+    "description": "ConflictDialog right-side comparison heading.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_size_label": {
+    "message": "크기:",
+    "description": "Label prefixing the file size in the ConflictDialog comparison panel."
+  },
+  "dialog_conflict_modified_label": {
+    "message": "수정:",
+    "description": "Label prefixing the modified timestamp in the ConflictDialog comparison panel."
+  },
+  "dialog_conflict_apply_to_all": {
+    "message": "이후 충돌에도 같은 선택 적용 ($count$건)",
+    "description": "Checkbox label that carries the chosen strategy across the rest of the batch.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "dialog_conflict_skip": {
+    "message": "건너뛰기",
+    "description": "ConflictDialog action — leave the destination untouched."
+  },
+  "dialog_conflict_overwrite": {
+    "message": "덮어쓰기",
+    "description": "ConflictDialog action — replace the destination with the source."
+  },
+  "dialog_conflict_rename": {
+    "message": "이름 변경 (자동)",
+    "description": "ConflictDialog action — keep both by renaming the incoming copy."
+  },
+
+  "dialog_failure_summary_stats": {
+    "message": "성공: $success$건 · 실패: $fail$건",
+    "description": "FailureSummary stats line.",
+    "placeholders": {
+      "success": { "content": "$1", "example": "10" },
+      "fail": { "content": "$2", "example": "2" }
+    }
+  },
+  "dialog_failure_col_path": {
+    "message": "경로",
+    "description": "FailureSummary table column — full path of the failing entry."
+  },
+  "dialog_failure_col_code": {
+    "message": "코드",
+    "description": "FailureSummary table column — error code."
+  },
+  "dialog_failure_col_message": {
+    "message": "메시지",
+    "description": "FailureSummary table column — human-readable error message."
+  },
+
+  "toast_kind_copy": {
+    "message": "복사",
+    "description": "Progress toast badge for copy jobs."
+  },
+  "toast_kind_move": {
+    "message": "이동",
+    "description": "Progress toast badge for move jobs."
+  },
+  "toast_canceling": {
+    "message": "취소 중…",
+    "description": "Progress toast state — a cancel has been dispatched but the op hasn't terminated yet."
+  },
+  "toast_done": {
+    "message": "완료",
+    "description": "Progress toast terminal state — op completed successfully."
+  },
+  "toast_canceled": {
+    "message": "취소됨",
+    "description": "Progress toast terminal state — op was canceled."
+  },
+  "toast_failed": {
+    "message": "실패",
+    "description": "Progress toast terminal state — op failed with no per-entry breakdown."
+  },
+  "toast_failed_count": {
+    "message": "$count$건 실패",
+    "description": "Progress toast terminal state — some entries succeeded, some failed.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "toast_file_progress": {
+    "message": "파일 $done$/$total$",
+    "description": "Per-file progress counter inside the toast.",
+    "placeholders": {
+      "done": { "content": "$1", "example": "4" },
+      "total": { "content": "$2", "example": "10" }
+    }
+  },
+  "toast_cancel_button": {
+    "message": "취소",
+    "description": "Button on a running toast that issues a cancel."
+  },
+  "toast_failures_summary": {
+    "message": "$count$건 실패",
+    "description": "Collapsed <summary> of the per-entry failure list on a terminated toast.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "toast_failures_more": {
+    "message": "... +$count$건",
+    "description": "Suffix shown when the failure list has been truncated.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "7" }
+    }
+  },
+  "toast_result_copy_title": {
+    "message": "복사 결과",
+    "description": "FailureSummary title when the terminated job was a copy."
+  },
+  "toast_result_move_title": {
+    "message": "이동 결과",
+    "description": "FailureSummary title when the terminated job was a move."
   }
 }

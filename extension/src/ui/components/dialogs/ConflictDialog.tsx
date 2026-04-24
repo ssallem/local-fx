@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatBytes, formatTime } from "../../utils/format";
+import { t } from "../../utils/i18n";
 
 /**
  * Phase 2.4 — paste-time conflict prompt.
@@ -112,21 +113,19 @@ export function ConflictDialog({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="conflict-dialog-title">대상 이름이 이미 존재합니다</h2>
+        <h2 id="conflict-dialog-title">{t("dialog_conflict_title")}</h2>
         {remainingCount > 1 && (
           <div className="conflict-remaining">
-            남은 충돌 {remainingCount}건 — 선택을 일괄 적용하려면 아래
-            체크박스를 사용하세요.
+            {t("dialog_conflict_remaining", [remainingCount])}
           </div>
         )}
         <p className="dialog-message">
-          <code>{dstName}</code> 파일/폴더가 대상 위치에 이미 있습니다. 어떻게
-          처리할까요?
+          {t("dialog_conflict_message", [dstName])}
         </p>
 
         <div className="conflict-compare">
           <div className="conflict-compare-side">
-            <h4>원본 ({srcName})</h4>
+            <h4>{t("dialog_conflict_src_header", [srcName])}</h4>
             <div
               className="conflict-compare-path"
               title={conflict.srcPath}
@@ -134,13 +133,15 @@ export function ConflictDialog({
               {conflict.srcPath}
             </div>
             <div className="conflict-compare-meta">
-              크기: {formatBytes(conflict.srcSize ?? null)}
+              {t("dialog_conflict_size_label")}{" "}
+              {formatBytes(conflict.srcSize ?? null)}
               <br />
-              수정: {formatTime(conflict.srcMtime ?? null)}
+              {t("dialog_conflict_modified_label")}{" "}
+              {formatTime(conflict.srcMtime ?? null)}
             </div>
           </div>
           <div className="conflict-compare-side">
-            <h4>대상 ({dstName})</h4>
+            <h4>{t("dialog_conflict_dst_header", [dstName])}</h4>
             <div
               className="conflict-compare-path"
               title={conflict.dstPath}
@@ -148,9 +149,11 @@ export function ConflictDialog({
               {conflict.dstPath}
             </div>
             <div className="conflict-compare-meta">
-              크기: {formatBytes(conflict.dstSize ?? null)}
+              {t("dialog_conflict_size_label")}{" "}
+              {formatBytes(conflict.dstSize ?? null)}
               <br />
-              수정: {formatTime(conflict.dstMtime ?? null)}
+              {t("dialog_conflict_modified_label")}{" "}
+              {formatTime(conflict.dstMtime ?? null)}
             </div>
           </div>
         </div>
@@ -162,7 +165,9 @@ export function ConflictDialog({
             checked={applyToAll}
             onChange={(e) => setApplyToAll(e.target.checked)}
           />
-          이후 충돌에도 같은 선택 적용 ({Math.max(0, remainingCount - 1)}건)
+          {t("dialog_conflict_apply_to_all", [
+            Math.max(0, remainingCount - 1)
+          ])}
         </label>
 
         <div className="dialog-buttons">
@@ -171,7 +176,7 @@ export function ConflictDialog({
             type="button"
             onClick={() => onResolve("skip", applyToAll)}
           >
-            건너뛰기
+            {t("dialog_conflict_skip")}
           </button>
           <button
             ref={overwriteBtnRef}
@@ -179,14 +184,14 @@ export function ConflictDialog({
             className="danger"
             onClick={() => onResolve("overwrite", applyToAll)}
           >
-            덮어쓰기
+            {t("dialog_conflict_overwrite")}
           </button>
           <button
             ref={renameBtnRef}
             type="button"
             onClick={() => onResolve("rename", applyToAll)}
           >
-            이름 변경 (자동)
+            {t("dialog_conflict_rename")}
           </button>
         </div>
       </div>

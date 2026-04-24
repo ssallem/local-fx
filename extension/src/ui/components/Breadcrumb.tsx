@@ -1,5 +1,6 @@
 import { splitPath } from "../utils/format";
 import { useExplorerStore } from "../store/explorer";
+import { t } from "../utils/i18n";
 
 interface Props {
   path: string | null;
@@ -10,16 +11,17 @@ export function Breadcrumb({ path }: Props): JSX.Element {
   const goHome = useExplorerStore((s) => s.goHome);
 
   const segments = path === null ? [] : splitPath(path);
+  const drivesLabel = t("breadcrumb_drives");
 
   return (
-    <nav className="breadcrumb" aria-label="path">
+    <nav className="breadcrumb" aria-label={t("breadcrumb_aria")}>
       <button
         type="button"
         className="breadcrumb-home"
         onClick={goHome}
-        title="Drives"
+        title={drivesLabel}
       >
-        Drives
+        {drivesLabel}
       </button>
       {segments.map((seg, i) => (
         <span key={seg.path} className="breadcrumb-seg">

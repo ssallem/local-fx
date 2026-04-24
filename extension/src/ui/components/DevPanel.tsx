@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { request } from "../ipc";
 import type { PingData, Response } from "../../types/shared";
+import { t } from "../utils/i18n";
 
 interface Props {
   open: boolean;
@@ -25,10 +26,10 @@ export function DevPanel({ open, onClose }: Props): JSX.Element | null {
   if (!open) return null;
 
   return (
-    <div className="devpanel" role="dialog" aria-label="Developer panel">
+    <div className="devpanel" role="dialog" aria-label={t("devpanel_aria")}>
       <div className="devpanel-header">
-        <strong>Dev panel</strong>
-        <button type="button" onClick={onClose} aria-label="Close">
+        <strong>{t("devpanel_title")}</strong>
+        <button type="button" onClick={onClose} aria-label={t("common_close")}>
           ✕
         </button>
       </div>
@@ -40,7 +41,7 @@ export function DevPanel({ open, onClose }: Props): JSX.Element | null {
           }}
           disabled={busy}
         >
-          {busy ? "Pinging…" : "Ping Host"}
+          {busy ? t("devpanel_pinging") : t("devpanel_ping_host")}
         </button>
         {result && result.ok && (
           <pre className="devpanel-pre">{JSON.stringify(result, null, 2)}</pre>
@@ -48,7 +49,7 @@ export function DevPanel({ open, onClose }: Props): JSX.Element | null {
         {result && !result.ok && (
           <div className="devpanel-err">
             <strong>{result.error.code}</strong>: {result.error.message}
-            {result.error.retryable ? " (retryable)" : ""}
+            {result.error.retryable ? t("devpanel_retryable_suffix") : ""}
           </div>
         )}
       </div>

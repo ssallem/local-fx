@@ -1,4 +1,5 @@
 import { useExplorerStore } from "../store/explorer";
+import { t } from "../utils/i18n";
 
 const LARGE_DIR_WARN_THRESHOLD = 5000;
 
@@ -16,18 +17,25 @@ export function StatusBar(): JSX.Element {
   if (currentPath === null) {
     return (
       <footer className="statusbar">
-        <span>{driveCount} drives</span>
+        <span>{t("statusbar_drives_count", [driveCount])}</span>
       </footer>
     );
   }
 
   const showWarn = total > LARGE_DIR_WARN_THRESHOLD;
+  // Build the items summary as a single translated string with placeholders so
+  // translators can reorder shown/total/page without English-biased glue text.
+  const itemsLine = t("statusbar_items", [entries.length, total, page]);
+  const selectedSuffix =
+    selectionCount > 0
+      ? ` · ${t("statusbar_selected", [selectionCount])}`
+      : "";
 
   return (
     <footer className="statusbar">
       <span>
-        {entries.length} of {total} items • Page {page}
-        {selectionCount > 0 ? ` • ${selectionCount} selected` : ""}
+        {itemsLine}
+        {selectedSuffix}
       </span>
       {hasMore && (
         <button
@@ -38,13 +46,12 @@ export function StatusBar(): JSX.Element {
           }}
           disabled={loading}
         >
-          {loading ? "Loading…" : "Load more"}
+          {loading ? t("common_loading") : t("statusbar_load_more")}
         </button>
       )}
       {showWarn && (
         <span className="statusbar-warn">
-          Large directory ({total} entries) — performance may degrade; virtual
-          scroll comes in Phase 1.5.
+          {t("statusbar_large_dir", [total])}
         </span>
       )}
     </footer>

@@ -10,5 +10,560 @@
   "appDescription": {
     "message": "Open a new tab, get a file manager. Browse local drives, copy, move, rename, and trash — all in Chrome. Native Host required.",
     "description": "Web Store short description (max 132 chars)."
+  },
+
+  "common_ok": {
+    "message": "OK",
+    "description": "Default confirm button label."
+  },
+  "common_cancel": {
+    "message": "Cancel",
+    "description": "Default cancel button label."
+  },
+  "common_close": {
+    "message": "Close",
+    "description": "aria-label / tooltip for close (×) buttons."
+  },
+  "common_continue": {
+    "message": "Continue",
+    "description": "Confirm button for system-path pending confirms."
+  },
+  "common_retry": {
+    "message": "Retry",
+    "description": "Button that re-runs the last failed operation."
+  },
+  "common_dismiss": {
+    "message": "Dismiss",
+    "description": "Button that hides an error banner without retrying."
+  },
+  "common_loading": {
+    "message": "Loading…",
+    "description": "Generic loading placeholder."
+  },
+  "common_read_only": {
+    "message": "read-only",
+    "description": "Tag shown next to a read-only drive or file."
+  },
+
+  "app_home_title": {
+    "message": "Local Explorer",
+    "description": "Heading on the drive-list home screen."
+  },
+  "app_loading_drives": {
+    "message": "Loading drives…",
+    "description": "Home-screen placeholder while drives are being enumerated."
+  },
+  "app_no_drives_hint": {
+    "message": "No drives detected. Open the dev panel (⚙) to ping the host.",
+    "description": "Help text shown on the home screen when the Native Host returned zero drives."
+  },
+  "app_drive_capacity": {
+    "message": "$free$ free / $total$",
+    "description": "Drive capacity meta line, e.g. '12 GB free / 500 GB'.",
+    "placeholders": {
+      "free": { "content": "$1", "example": "12 GB" },
+      "total": { "content": "$2", "example": "500 GB" }
+    }
+  },
+  "app_drive_read_only_suffix": {
+    "message": "read-only",
+    "description": "Appears after the capacity line when a drive is mounted read-only."
+  },
+
+  "toolbar_back": {
+    "message": "Back",
+    "description": "Toolbar back button aria-label."
+  },
+  "toolbar_back_title": {
+    "message": "Back (Alt+Left)",
+    "description": "Tooltip for the back button."
+  },
+  "toolbar_forward": {
+    "message": "Forward",
+    "description": "Toolbar forward button aria-label."
+  },
+  "toolbar_forward_title": {
+    "message": "Forward (Alt+Right)",
+    "description": "Tooltip for the forward button."
+  },
+  "toolbar_up": {
+    "message": "Up",
+    "description": "Toolbar 'go up one level' aria-label."
+  },
+  "toolbar_up_title": {
+    "message": "Up (Backspace)",
+    "description": "Tooltip for the up-directory button."
+  },
+  "toolbar_reload": {
+    "message": "Reload",
+    "description": "Toolbar reload aria-label."
+  },
+  "toolbar_reload_title": {
+    "message": "Reload (F5)",
+    "description": "Tooltip for the reload button."
+  },
+  "toolbar_new_folder": {
+    "message": "New Folder",
+    "description": "Title/aria-label for the toolbar create-folder button."
+  },
+  "toolbar_new_folder_button": {
+    "message": "+ New Folder",
+    "description": "Visible label on the toolbar create-folder button."
+  },
+  "toolbar_dev_panel": {
+    "message": "Dev panel",
+    "description": "aria-label for the developer panel toggle."
+  },
+  "toolbar_dev_panel_title": {
+    "message": "Dev panel (Ctrl+Shift+P)",
+    "description": "Tooltip for the developer panel toggle."
+  },
+
+  "breadcrumb_aria": {
+    "message": "path",
+    "description": "aria-label for the breadcrumb navigation region."
+  },
+  "breadcrumb_drives": {
+    "message": "Drives",
+    "description": "Leftmost breadcrumb that returns to the drive-list screen."
+  },
+
+  "sidebar_drives": {
+    "message": "Drives",
+    "description": "Sidebar section title listing mounted drives."
+  },
+  "sidebar_no_drives": {
+    "message": "No drives",
+    "description": "Placeholder shown when no drives are available."
+  },
+  "sidebar_browse": {
+    "message": "Browse",
+    "description": "Sidebar section title for user shortcuts (future)."
+  },
+  "sidebar_browse_empty": {
+    "message": "(empty)",
+    "description": "Placeholder shown when the Browse section has no shortcuts."
+  },
+
+  "filelist_col_name": {
+    "message": "Name",
+    "description": "File list column header — file name."
+  },
+  "filelist_col_size": {
+    "message": "Size",
+    "description": "File list column header — size."
+  },
+  "filelist_col_modified": {
+    "message": "Modified",
+    "description": "File list column header — modified timestamp."
+  },
+  "filelist_loading": {
+    "message": "Loading…",
+    "description": "File list placeholder while entries are loading."
+  },
+  "filelist_empty": {
+    "message": "Empty directory",
+    "description": "File list placeholder when the current directory has no entries."
+  },
+  "filelist_read_only": {
+    "message": "read-only",
+    "description": "Tooltip for the lock icon shown on read-only entries."
+  },
+
+  "statusbar_drives_count": {
+    "message": "$count$ drives",
+    "description": "Status bar summary on the home screen.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "statusbar_items": {
+    "message": "$shown$ of $total$ items · Page $page$",
+    "description": "Status bar summary while browsing a directory.",
+    "placeholders": {
+      "shown": { "content": "$1", "example": "250" },
+      "total": { "content": "$2", "example": "1000" },
+      "page": { "content": "$3", "example": "1" }
+    }
+  },
+  "statusbar_selected": {
+    "message": "$count$ selected",
+    "description": "Suffix appended to the item count when one or more rows are selected.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "5" }
+    }
+  },
+  "statusbar_load_more": {
+    "message": "Load more",
+    "description": "Button that fetches the next page of directory entries."
+  },
+  "statusbar_large_dir": {
+    "message": "Large directory ($total$ entries) — performance may degrade; virtual scroll comes in Phase 1.5.",
+    "description": "Warning shown when a directory exceeds the large-dir threshold.",
+    "placeholders": {
+      "total": { "content": "$1", "example": "12345" }
+    }
+  },
+
+  "error_retryable_tag": {
+    "message": "retryable",
+    "description": "Small tag inside the error banner indicating the operation can be retried."
+  },
+  "error_hint_host_not_found": {
+    "message": "Native host 'com.local.fx' was not found. Run the installer or check the NativeMessagingHosts manifest registration.",
+    "description": "Install hint shown when the extension cannot reach the Native Messaging host."
+  },
+  "error_hint_may_need_install": {
+    "message": "The native host seems to be missing or unregistered. Run the installer.",
+    "description": "Generic install hint shown when the host reports mayNeedInstall."
+  },
+  "error_cannot_create_at_home": {
+    "message": "Cannot create a folder on the home screen.",
+    "description": "Surfaced when createFolder is invoked while currentPath is null."
+  },
+  "error_cannot_rename_root": {
+    "message": "Root paths cannot be renamed.",
+    "description": "Surfaced when renameEntry is invoked on a drive/volume root."
+  },
+  "error_e_host_not_found": {
+    "message": "Native host not found.",
+    "description": "Translated message for ErrorCode E_HOST_NOT_FOUND."
+  },
+  "error_e_host_crash": {
+    "message": "Native host crashed or disconnected.",
+    "description": "Translated message for ErrorCode E_HOST_CRASH."
+  },
+  "error_e_timeout": {
+    "message": "Request timed out.",
+    "description": "Translated message for ErrorCode E_TIMEOUT."
+  },
+  "error_e_protocol": {
+    "message": "Protocol error.",
+    "description": "Translated message for ErrorCode E_PROTOCOL."
+  },
+  "error_e_bad_request": {
+    "message": "Invalid request.",
+    "description": "Translated message for ErrorCode E_BAD_REQUEST."
+  },
+  "error_e_unknown": {
+    "message": "Unknown error.",
+    "description": "Translated message for ErrorCode E_UNKNOWN."
+  },
+  "error_eacces": {
+    "message": "Access denied.",
+    "description": "Translated message for ErrorCode EACCES."
+  },
+  "error_enoent": {
+    "message": "File or folder not found.",
+    "description": "Translated message for ErrorCode ENOENT."
+  },
+  "error_enospc": {
+    "message": "No space left on device.",
+    "description": "Translated message for ErrorCode ENOSPC."
+  },
+  "error_ebusy": {
+    "message": "File is in use by another application.",
+    "description": "Translated message for ErrorCode EBUSY."
+  },
+  "error_einval": {
+    "message": "Invalid argument.",
+    "description": "Translated message for ErrorCode EINVAL."
+  },
+  "error_e_system_path_confirm_required": {
+    "message": "System path confirmation required.",
+    "description": "Translated message for ErrorCode E_SYSTEM_PATH_CONFIRM_REQUIRED."
+  },
+
+  "devpanel_aria": {
+    "message": "Developer panel",
+    "description": "aria-label for the slide-over dev panel."
+  },
+  "devpanel_title": {
+    "message": "Dev panel",
+    "description": "Heading inside the dev panel."
+  },
+  "devpanel_ping_host": {
+    "message": "Ping Host",
+    "description": "Button that sends a ping op to the Native Host."
+  },
+  "devpanel_pinging": {
+    "message": "Pinging…",
+    "description": "Button state while a ping request is in flight."
+  },
+  "devpanel_retryable_suffix": {
+    "message": " (retryable)",
+    "description": "Suffix appended to the dev panel error line when the op is retryable."
+  },
+
+  "context_open": {
+    "message": "Open",
+    "description": "Context menu — open a directory."
+  },
+  "context_open_default": {
+    "message": "Open with default app",
+    "description": "Context menu — open a file with the OS default handler."
+  },
+  "context_reveal": {
+    "message": "Reveal in Explorer",
+    "description": "Context menu — show the entry in the OS file manager."
+  },
+  "context_copy": {
+    "message": "Copy",
+    "description": "Context menu — copy selection to clipboard."
+  },
+  "context_cut": {
+    "message": "Cut",
+    "description": "Context menu — cut selection to clipboard."
+  },
+  "context_paste": {
+    "message": "Paste",
+    "description": "Context menu — paste clipboard contents into the current directory."
+  },
+  "context_rename": {
+    "message": "Rename",
+    "description": "Context menu — rename the entry."
+  },
+  "context_trash": {
+    "message": "Move to Trash",
+    "description": "Context menu — send the entry to the OS recycle bin / trash."
+  },
+  "context_permanent_delete": {
+    "message": "Delete permanently",
+    "description": "Context menu — delete the entry permanently."
+  },
+  "context_new_folder": {
+    "message": "+ New Folder",
+    "description": "Context menu — create a new folder in the current directory."
+  },
+  "context_refresh": {
+    "message": "Refresh",
+    "description": "Context menu — re-read the current directory."
+  },
+
+  "dialog_rename_title": {
+    "message": "Name",
+    "description": "Default RenameDialog heading when no custom title is provided."
+  },
+  "dialog_rename_title_new_folder": {
+    "message": "New Folder",
+    "description": "RenameDialog heading when creating a folder."
+  },
+  "dialog_rename_title_rename": {
+    "message": "Rename",
+    "description": "RenameDialog heading when renaming an entry."
+  },
+  "dialog_rename_default_name_new_folder": {
+    "message": "New Folder",
+    "description": "Default suggested name pre-filled when creating a new folder."
+  },
+  "dialog_rename_validation_empty": {
+    "message": "Enter a name.",
+    "description": "Validation error: name field is empty."
+  },
+  "dialog_rename_validation_whitespace": {
+    "message": "Leading or trailing whitespace is not allowed.",
+    "description": "Validation error: name has outer whitespace."
+  },
+  "dialog_rename_validation_forbidden": {
+    "message": "\\ / : * ? \" < > | are not allowed.",
+    "description": "Validation error: name contains reserved characters."
+  },
+  "dialog_rename_validation_control": {
+    "message": "Control characters (newline, tab, etc.) are not allowed.",
+    "description": "Validation error: name contains C0 control characters."
+  },
+  "dialog_rename_validation_dot": {
+    "message": "'.' and '..' are not allowed.",
+    "description": "Validation error: name is '.' or '..'."
+  },
+
+  "dialog_delete_title_permanent": {
+    "message": "Delete permanently",
+    "description": "ConfirmDialog title for permanent delete."
+  },
+  "dialog_delete_title_trash": {
+    "message": "Move to Trash",
+    "description": "ConfirmDialog title for trash/move-to-recycle-bin."
+  },
+  "dialog_delete_message_permanent": {
+    "message": "'$name$' will be deleted permanently. This action cannot be undone.",
+    "description": "ConfirmDialog body for permanent delete.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_delete_message_trash": {
+    "message": "'$name$' will be moved to the Trash.",
+    "description": "ConfirmDialog body for trash move.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+
+  "system_path_confirm_title": {
+    "message": "System path warning",
+    "description": "ConfirmDialog title when the host guards against writing to a system path."
+  },
+  "system_path_confirm_message": {
+    "message": "'$path$' is a system path. Continue?",
+    "description": "ConfirmDialog body for a single-path system guard (mkdir/remove).",
+    "placeholders": {
+      "path": { "content": "$1", "example": "C:\\Windows\\System32" }
+    }
+  },
+  "system_path_confirm_message_rename": {
+    "message": "'$src$' or '$dst$' is a system path. Continue?",
+    "description": "ConfirmDialog body for a rename system guard (src OR dst may match).",
+    "placeholders": {
+      "src": { "content": "$1", "example": "C:\\Windows" },
+      "dst": { "content": "$2", "example": "C:\\Windows.bak" }
+    }
+  },
+
+  "dialog_conflict_title": {
+    "message": "Destination already exists",
+    "description": "ConflictDialog title."
+  },
+  "dialog_conflict_remaining": {
+    "message": "$count$ conflicts remaining — use the checkbox below to apply your choice to all.",
+    "description": "ConflictDialog hint when a batch has multiple conflicts.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "4" }
+    }
+  },
+  "dialog_conflict_message": {
+    "message": "A file or folder named '$name$' already exists at the destination. What would you like to do?",
+    "description": "ConflictDialog body.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_src_header": {
+    "message": "Source ($name$)",
+    "description": "ConflictDialog left-side comparison heading.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_dst_header": {
+    "message": "Destination ($name$)",
+    "description": "ConflictDialog right-side comparison heading.",
+    "placeholders": {
+      "name": { "content": "$1", "example": "report.pdf" }
+    }
+  },
+  "dialog_conflict_size_label": {
+    "message": "Size:",
+    "description": "Label prefixing the file size in the ConflictDialog comparison panel."
+  },
+  "dialog_conflict_modified_label": {
+    "message": "Modified:",
+    "description": "Label prefixing the modified timestamp in the ConflictDialog comparison panel."
+  },
+  "dialog_conflict_apply_to_all": {
+    "message": "Apply the same choice to remaining conflicts ($count$)",
+    "description": "Checkbox label that carries the chosen strategy across the rest of the batch.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "dialog_conflict_skip": {
+    "message": "Skip",
+    "description": "ConflictDialog action — leave the destination untouched."
+  },
+  "dialog_conflict_overwrite": {
+    "message": "Overwrite",
+    "description": "ConflictDialog action — replace the destination with the source."
+  },
+  "dialog_conflict_rename": {
+    "message": "Auto-rename",
+    "description": "ConflictDialog action — keep both by renaming the incoming copy."
+  },
+
+  "dialog_failure_summary_stats": {
+    "message": "$success$ succeeded · $fail$ failed",
+    "description": "FailureSummary stats line.",
+    "placeholders": {
+      "success": { "content": "$1", "example": "10" },
+      "fail": { "content": "$2", "example": "2" }
+    }
+  },
+  "dialog_failure_col_path": {
+    "message": "Path",
+    "description": "FailureSummary table column — full path of the failing entry."
+  },
+  "dialog_failure_col_code": {
+    "message": "Code",
+    "description": "FailureSummary table column — error code."
+  },
+  "dialog_failure_col_message": {
+    "message": "Message",
+    "description": "FailureSummary table column — human-readable error message."
+  },
+
+  "toast_kind_copy": {
+    "message": "Copy",
+    "description": "Progress toast badge for copy jobs."
+  },
+  "toast_kind_move": {
+    "message": "Move",
+    "description": "Progress toast badge for move jobs."
+  },
+  "toast_canceling": {
+    "message": "Canceling…",
+    "description": "Progress toast state — a cancel has been dispatched but the op hasn't terminated yet."
+  },
+  "toast_done": {
+    "message": "Done",
+    "description": "Progress toast terminal state — op completed successfully."
+  },
+  "toast_canceled": {
+    "message": "Canceled",
+    "description": "Progress toast terminal state — op was canceled."
+  },
+  "toast_failed": {
+    "message": "Failed",
+    "description": "Progress toast terminal state — op failed with no per-entry breakdown."
+  },
+  "toast_failed_count": {
+    "message": "$count$ failed",
+    "description": "Progress toast terminal state — some entries succeeded, some failed.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "toast_file_progress": {
+    "message": "Files $done$/$total$",
+    "description": "Per-file progress counter inside the toast.",
+    "placeholders": {
+      "done": { "content": "$1", "example": "4" },
+      "total": { "content": "$2", "example": "10" }
+    }
+  },
+  "toast_cancel_button": {
+    "message": "Cancel",
+    "description": "Button on a running toast that issues a cancel."
+  },
+  "toast_failures_summary": {
+    "message": "$count$ failed",
+    "description": "Collapsed <summary> of the per-entry failure list on a terminated toast.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "3" }
+    }
+  },
+  "toast_failures_more": {
+    "message": "... +$count$ more",
+    "description": "Suffix shown when the failure list has been truncated.",
+    "placeholders": {
+      "count": { "content": "$1", "example": "7" }
+    }
+  },
+  "toast_result_copy_title": {
+    "message": "Copy result",
+    "description": "FailureSummary title when the terminated job was a copy."
+  },
+  "toast_result_move_title": {
+    "message": "Move result",
+    "description": "FailureSummary title when the terminated job was a move."
   }
 }

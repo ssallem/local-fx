@@ -3,7 +3,7 @@
   "default_locale": "en",
   "name": "__MSG_appName__",
   "short_name": "__MSG_appShortName__",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "__MSG_appDescription__",
   "author": "LocalFx",
   "homepage_url": "https://github.com/ssallem/local-fx",
@@ -25,7 +25,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Local Explorer",
+    "default_title": "__MSG_appName__",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",

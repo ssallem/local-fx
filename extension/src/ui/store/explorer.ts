@@ -137,6 +137,7 @@ import {
   revealEntry as ipcRevealEntry
 } from "../ipc";
 import { joinPath, parentPath } from "../utils/format";
+import { t } from "../utils/i18n";
 
 /**
  * Explorer state machine.
@@ -544,7 +545,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       set({
         error: new IpcError({
           code: "EINVAL",
-          message: "홈 화면에서는 폴더를 만들 수 없습니다",
+          message: t("error_cannot_create_at_home"),
           retryable: false
         })
       });
@@ -565,8 +566,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
         set({
           pendingConfirm: {
             kind: "system-path",
-            title: "시스템 경로 경고",
-            message: `'${path}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            title: t("system_path_confirm_title"),
+            message: t("system_path_confirm_message", [path]),
             onConfirm: async () => {
               await runner(true);
             }
@@ -584,7 +585,7 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       set({
         error: new IpcError({
           code: "EINVAL",
-          message: "루트 경로는 이름을 변경할 수 없습니다",
+          message: t("error_cannot_rename_root"),
           retryable: false
         })
       });
@@ -605,8 +606,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
         set({
           pendingConfirm: {
             kind: "system-path",
-            title: "시스템 경로 경고",
-            message: `'${oldPath}' 또는 '${dst}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            title: t("system_path_confirm_title"),
+            message: t("system_path_confirm_message_rename", [oldPath, dst]),
             onConfirm: async () => {
               await runner(true);
             }
@@ -633,8 +634,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
         set({
           pendingConfirm: {
             kind: "system-path",
-            title: "시스템 경로 경고",
-            message: `'${path}'는 시스템 경로입니다. 계속 진행하시겠습니까?`,
+            title: t("system_path_confirm_title"),
+            message: t("system_path_confirm_message", [path]),
             onConfirm: async () => {
               await runner(true);
             }

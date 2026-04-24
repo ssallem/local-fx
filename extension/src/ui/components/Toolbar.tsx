@@ -1,4 +1,5 @@
 import { useExplorerStore } from "../store/explorer";
+import { t } from "../utils/i18n";
 import { Breadcrumb } from "./Breadcrumb";
 
 interface Props {
@@ -32,8 +33,8 @@ export function Toolbar({
             void goBack();
           }}
           disabled={!canBack}
-          title="Back (Alt+Left)"
-          aria-label="Back"
+          title={t("toolbar_back_title")}
+          aria-label={t("toolbar_back")}
         >
           ←
         </button>
@@ -43,8 +44,8 @@ export function Toolbar({
             void goForward();
           }}
           disabled={!canForward}
-          title="Forward (Alt+Right)"
-          aria-label="Forward"
+          title={t("toolbar_forward_title")}
+          aria-label={t("toolbar_forward")}
         >
           →
         </button>
@@ -54,8 +55,8 @@ export function Toolbar({
             void goUp();
           }}
           disabled={!canUp}
-          title="Up (Backspace)"
-          aria-label="Up"
+          title={t("toolbar_up_title")}
+          aria-label={t("toolbar_up")}
         >
           ↑
         </button>
@@ -64,8 +65,8 @@ export function Toolbar({
           onClick={() => {
             void reload();
           }}
-          title="Reload (F5)"
-          aria-label="Reload"
+          title={t("toolbar_reload_title")}
+          aria-label={t("toolbar_reload")}
         >
           ⟳
         </button>
@@ -73,10 +74,10 @@ export function Toolbar({
           type="button"
           onClick={onCreateFolder}
           disabled={!canCreate}
-          title="새 폴더"
-          aria-label="새 폴더"
+          title={t("toolbar_new_folder")}
+          aria-label={t("toolbar_new_folder")}
         >
-          + 새 폴더
+          {t("toolbar_new_folder_button")}
         </button>
       </div>
       <Breadcrumb path={currentPath} />
@@ -85,8 +86,8 @@ export function Toolbar({
         type="button"
         className="toolbar-dev"
         onClick={onToggleDevPanel}
-        title="Dev panel (Ctrl+Shift+P)"
-        aria-label="Dev panel"
+        title={t("toolbar_dev_panel_title")}
+        aria-label={t("toolbar_dev_panel")}
       >
         ⚙
       </button>
