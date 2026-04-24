@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Tab Explorer: File Manager in a New Tab",
+    "description": "Extension name shown in Chrome UI and the Web Store listing."
+  },
+  "appShortName": {
+    "message": "Tab Explorer",
+    "description": "Short name used in limited-space UI like the toolbar icon tooltip."
+  },
+  "appDescription": {
+    "message": "Open a new tab, get a file manager. Browse local drives, copy, move, rename, and trash — all in Chrome. Native Host required.",
+    "description": "Web Store short description (max 132 chars)."
+  }
+}

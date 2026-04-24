@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "탭 탐색기 — 새 탭 속 파일 탐색기",
+    "description": "Extension name shown in Chrome UI and the Web Store listing."
+  },
+  "appShortName": {
+    "message": "탭 탐색기",
+    "description": "Short name used in limited-space UI like the toolbar icon tooltip."
+  },
+  "appDescription": {
+    "message": "새 탭이 곧 파일 탐색기. 로컬 드라이브 탐색, 복사·이동·이름 변경·휴지통까지 Chrome 안에서. Native Host 설치 필요.",
+    "description": "Web Store short description (max 132 chars)."
+  }
+}
