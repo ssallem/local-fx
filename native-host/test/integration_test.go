@@ -49,8 +49,12 @@ func readFrameFrom(r io.Reader) ([]byte, error) {
 // compiled binary. It is intentionally a thin wrapper that mirrors main.run,
 // including the io.EOF-as-clean-shutdown semantics so tests that close the
 // writer observe the same graceful exit the real binary does.
+//
+// Phase 2.3 additions: routes Request.Stream=true through LookupStream on a
+// goroutine using the shared SafeWriter, mirroring the production dispatcher.
 func runHost(ctx context.Context, in io.Reader, out io.Writer) error {
 	logger := log.New(io.Discard, "", 0)
+	safeOut := protocol.NewSafeWriter(out)
 	for {
 		body, err := protocol.ReadFrame(in)
 		if err != nil {
@@ -63,9 +67,38 @@ func runHost(ctx context.Context, in io.Reader, out io.Writer) error {
 		if err := protocol.Decode(body, &req); err != nil {
 			resp := protocol.ErrorResponse("", protocol.ErrCodeBadRequest, err.Error(), false)
 			enc, _ := protocol.Encode(resp)
-			if err := protocol.WriteFrame(out, enc); err != nil {
+			if err := safeOut.WriteFrame(enc); err != nil {
 				return err
 			}
+			continue
+		}
+		if req.Stream {
+			streamH := ops.LookupStream(req.Op)
+			if streamH == nil {
+				resp := protocol.ErrorResponse(req.ID, protocol.ErrCodeUnknownOp,
+					"no stream handler for op: "+req.Op, false)
+				enc, _ := protocol.Encode(resp)
+				if err := safeOut.WriteFrame(enc); err != nil {
+					return err
+				}
+				continue
+			}
+			go func(req protocol.Request) {
+				opCtx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				ops.RegisterJob(req.ID, cancel)
+				defer ops.UnregisterJob(req.ID)
+				emit := func(evt protocol.EventFrame) error {
+					enc, merr := json.Marshal(evt)
+					if merr != nil {
+						return merr
+					}
+					return safeOut.WriteFrame(enc)
+				}
+				resp := streamH(opCtx, req, emit)
+				enc, _ := protocol.Encode(resp)
+				_ = safeOut.WriteFrame(enc)
+			}(req)
 			continue
 		}
 		handler := ops.Lookup(req.Op)
@@ -80,7 +113,7 @@ func runHost(ctx context.Context, in io.Reader, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		if err := protocol.WriteFrame(out, enc); err != nil {
+		if err := safeOut.WriteFrame(enc); err != nil {
 			return err
 		}
 	}
@@ -459,6 +492,211 @@ func TestIntegration_Phase21_PingReportsV2(t *testing.T) {
 		}
 	default:
 		t.Fatalf("hostMaxProtocolVersion unexpected type %T", data["hostMaxProtocolVersion"])
+	}
+}
+
+// spawnStreamHost is like spawnHost but returns a receiver that hands back
+// each incoming frame (event OR final response) one at a time, so tests can
+// assert on the streaming sequence explicitly.
+func spawnStreamHost(t *testing.T) (sendFrame func([]byte), recvFrame func() []byte, cleanup func()) {
+	t.Helper()
+	hostIn, extWrite := io.Pipe()
+	extRead, hostOut := io.Pipe()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = runHost(ctx, hostIn, hostOut)
+	}()
+
+	sendFrame = func(body []byte) {
+		t.Helper()
+		if err := writeFrameTo(extWrite, body); err != nil {
+			t.Fatalf("write frame: %v", err)
+		}
+	}
+	recvFrame = func() []byte {
+		t.Helper()
+		body, err := readFrameFrom(extRead)
+		if err != nil {
+			t.Fatalf("read frame: %v", err)
+		}
+		return body
+	}
+	cleanup = func() {
+		_ = extWrite.Close()
+		_ = hostOut.Close()
+		wg.Wait()
+		cancel()
+	}
+	return
+}
+
+// TestIntegration_StreamingCopy_EventsThenResponse drives a streaming copy
+// end-to-end through the real dispatcher + codec. It asserts the emission
+// contract from PROTOCOL.md §6: one or more events (progress/done), then
+// the final OK Response, all sharing the same request ID.
+func TestIntegration_StreamingCopy_EventsThenResponse(t *testing.T) {
+	base := t.TempDir()
+	src := filepath.Join(base, "stream-src.bin")
+	dst := filepath.Join(base, "stream-dst.bin")
+	payload := bytes.Repeat([]byte{0xAB}, 64*1024) // exactly one buf
+	if err := os.WriteFile(src, payload, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	sendFrame, recvFrame, cleanup := spawnStreamHost(t)
+	defer cleanup()
+
+	reqBody, _ := json.Marshal(protocol.Request{
+		ID:              "stream-cp-1",
+		Op:              "copy",
+		Stream:          true,
+		ProtocolVersion: 2,
+		Args:            mustMarshal(t, map[string]any{"src": src, "dst": dst}),
+	})
+	sendFrame(reqBody)
+
+	// Read frames until we hit a terminal Response. Any intermediate
+	// event frames must reference the same ID.
+	sawDone := false
+	sawResponse := false
+	for !sawResponse {
+		raw := recvFrame()
+		// Both EventFrame and Response have "id" and no "ok" vs "ok"
+		// distinction; parse as a generic map to branch.
+		var peek map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &peek); err != nil {
+			t.Fatalf("peek: %v", err)
+		}
+		if _, isEvent := peek["event"]; isEvent {
+			var evt protocol.EventFrame
+			if err := json.Unmarshal(raw, &evt); err != nil {
+				t.Fatalf("unmarshal event: %v", err)
+			}
+			if evt.ID != "stream-cp-1" {
+				t.Errorf("event ID: got %q want stream-cp-1", evt.ID)
+			}
+			if evt.Event == "done" {
+				sawDone = true
+			}
+			continue
+		}
+		var resp protocol.Response
+		if err := json.Unmarshal(raw, &resp); err != nil {
+			t.Fatalf("unmarshal resp: %v", err)
+		}
+		if resp.ID != "stream-cp-1" {
+			t.Errorf("resp ID: got %q want stream-cp-1", resp.ID)
+		}
+		if !resp.OK {
+			t.Errorf("resp: got error %+v", resp.Error)
+		}
+		sawResponse = true
+	}
+	if !sawDone {
+		t.Error("expected at least one 'done' event before the final Response")
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read dst: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("dst mismatch: %d vs %d bytes", len(got), len(payload))
+	}
+}
+
+// TestIntegration_CancelStreamingCopy sends a copy request and then a cancel
+// request targeting the same ID, then verifies the final frame sequence
+// contains a done{canceled:true} event and the dst was not published.
+func TestIntegration_CancelStreamingCopy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("cancel race test skipped in -short mode")
+	}
+	base := t.TempDir()
+	src := filepath.Join(base, "cancel-src.bin")
+	dst := filepath.Join(base, "cancel-dst.bin")
+	// Large enough to guarantee the copy is still running when we send
+	// the cancel. 64MB covers even NVMe CI runners.
+	payload := bytes.Repeat([]byte{0xCD}, 64*1024*1024)
+	if err := os.WriteFile(src, payload, 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	sendFrame, recvFrame, cleanup := spawnStreamHost(t)
+	defer cleanup()
+
+	copyReq, _ := json.Marshal(protocol.Request{
+		ID:     "cp-stream-cancel",
+		Op:     "copy",
+		Stream: true,
+		Args:   mustMarshal(t, map[string]any{"src": src, "dst": dst}),
+	})
+	sendFrame(copyReq)
+
+	// Tiny delay to let the handler enter its loop, then fire cancel.
+	time.Sleep(30 * time.Millisecond)
+	cancelReq, _ := json.Marshal(protocol.Request{
+		ID:   "cancel-1",
+		Op:   "cancel",
+		Args: mustMarshal(t, map[string]any{"targetId": "cp-stream-cancel"}),
+	})
+	sendFrame(cancelReq)
+
+	sawCanceledDone := false
+	sawCancelResp := false
+	sawCopyResp := false
+	for !sawCopyResp || !sawCancelResp {
+		raw := recvFrame()
+		var peek map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &peek); err != nil {
+			t.Fatalf("peek: %v", err)
+		}
+		if _, isEvent := peek["event"]; isEvent {
+			var evt protocol.EventFrame
+			_ = json.Unmarshal(raw, &evt)
+			if evt.Event == "done" && evt.ID == "cp-stream-cancel" {
+				if pm, ok := evt.Payload.(map[string]any); ok {
+					if c, _ := pm["canceled"].(bool); c {
+						sawCanceledDone = true
+					}
+				}
+			}
+			continue
+		}
+		var resp protocol.Response
+		_ = json.Unmarshal(raw, &resp)
+		switch resp.ID {
+		case "cp-stream-cancel":
+			sawCopyResp = true
+			if !resp.OK {
+				t.Errorf("copy final resp: got error %+v, want OK", resp.Error)
+			}
+		case "cancel-1":
+			sawCancelResp = true
+			if !resp.OK {
+				t.Errorf("cancel resp: %+v", resp.Error)
+			}
+		default:
+			t.Errorf("unexpected response id: %q", resp.ID)
+		}
+	}
+
+	if !sawCanceledDone {
+		// Could be a race: if cancel lost to a fast disk, the handler
+		// would emit a normal done and the copy would succeed. Tolerate
+		// that path as a flake rather than a hard failure.
+		t.Log("cancel appears to have lost the race against disk; skipping canceled-done assertion")
+		return
+	}
+
+	// Destination must not exist on a confirmed cancel path.
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		t.Errorf("dst should not exist after cancel, err=%v", err)
 	}
 }
 

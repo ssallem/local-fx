@@ -2,16 +2,23 @@
 //
 // Lifecycle:
 //  1. Chrome spawns this process and writes length-prefixed JSON frames to stdin.
-//  2. We read one frame at a time, dispatch via ops.Lookup, and write the
-//     response frame to stdout.
+//  2. We read one frame at a time, dispatch via ops.Lookup (or ops.LookupStream
+//     for streaming ops), and write the response frame(s) to stdout.
 //  3. Chrome closing stdin (EOF) signals clean shutdown.
 //
 // All diagnostic logs go to stderr, which Chrome forwards to its own log but
 // does not treat as part of the protocol.
+//
+// Stdout writes go through a protocol.SafeWriter because Phase 2.3 streaming
+// ops (copy, move, search) run in their own goroutines and may emit event
+// frames concurrently with the main loop's response writes. Without the
+// mutex, two overlapping writes would interleave on the wire and desync
+// framing for both. See PROTOCOL.md §6.
 package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,11 +28,12 @@ import (
 
 	"local-fx-host/internal/ops"
 	"local-fx-host/internal/protocol"
+	"local-fx-host/internal/version"
 )
 
 func main() {
 	logger := log.New(os.Stderr, "fx-host ", log.LstdFlags|log.Lmicroseconds)
-	logger.Printf("starting fx-host v%s", ops.Version)
+	logger.Printf("starting fx-host v%s", version.Version)
 
 	if err := run(context.Background(), os.Stdin, os.Stdout, logger); err != nil {
 		logger.Printf("fatal: %v", err)
@@ -37,6 +45,7 @@ func main() {
 // run is main's body in testable form: stdin/stdout/logger are injected so
 // that integration tests can drive the full loop over io.Pipe pairs.
 func run(ctx context.Context, in io.Reader, out io.Writer, logger *log.Logger) error {
+	safeOut := protocol.NewSafeWriter(out)
 	for {
 		body, err := protocol.ReadFrame(in)
 		if err != nil {
@@ -51,35 +60,52 @@ func run(ctx context.Context, in io.Reader, out io.Writer, logger *log.Logger) e
 			return fmt.Errorf("read frame: %w", err)
 		}
 
-		resp := dispatch(ctx, body, logger)
-
-		encoded, err := protocol.Encode(resp)
-		if err != nil {
-			// Very unlikely (Response is always marshalable), but fall
-			// back to a hand-rolled error frame so we can keep going.
-			logger.Printf("encode response: %v", err)
-			encoded = fallbackEncoded()
+		var req protocol.Request
+		if derr := protocol.Decode(body, &req); derr != nil {
+			resp := protocol.ErrorResponse("", protocol.ErrCodeBadRequest,
+				fmt.Sprintf("invalid JSON: %v", derr), false)
+			if werr := writeResp(safeOut, resp, logger); werr != nil {
+				return werr
+			}
+			continue
 		}
-		if err := protocol.WriteFrame(out, encoded); err != nil {
-			return fmt.Errorf("write frame: %w", err)
+		if req.Op == "" {
+			resp := protocol.ErrorResponse(req.ID, protocol.ErrCodeBadRequest,
+				"missing required field: op", false)
+			if werr := writeResp(safeOut, resp, logger); werr != nil {
+				return werr
+			}
+			continue
+		}
+
+		// Streaming dispatch: kick the handler off on its own goroutine
+		// so the main loop can keep reading (in particular, keep reading
+		// the cancel request that targets this very job).
+		if req.Stream {
+			streamH := ops.LookupStream(req.Op)
+			if streamH == nil {
+				resp := protocol.ErrorResponse(req.ID, protocol.ErrCodeUnknownOp,
+					fmt.Sprintf("no stream handler for op: %q", req.Op), false)
+				if werr := writeResp(safeOut, resp, logger); werr != nil {
+					return werr
+				}
+				continue
+			}
+			go runStreamHandler(ctx, req, streamH, safeOut, logger)
+			continue
+		}
+
+		// Regular dispatch (one request -> one response).
+		resp := dispatch(ctx, req, logger)
+		if werr := writeResp(safeOut, resp, logger); werr != nil {
+			return werr
 		}
 	}
 }
 
-// dispatch parses one frame body and routes it to the appropriate handler.
-// Any panic inside a handler is recovered and converted to an E_INTERNAL
-// response so that one misbehaving op cannot crash the whole host.
-func dispatch(ctx context.Context, body []byte, logger *log.Logger) (resp protocol.Response) {
-	var req protocol.Request
-	if err := protocol.Decode(body, &req); err != nil {
-		return protocol.ErrorResponse("", protocol.ErrCodeBadRequest,
-			fmt.Sprintf("invalid JSON: %v", err), false)
-	}
-	if req.Op == "" {
-		return protocol.ErrorResponse(req.ID, protocol.ErrCodeBadRequest,
-			"missing required field: op", false)
-	}
-
+// dispatch resolves req to a registered Handler and runs it with panic
+// recovery. Unknown ops become E_UNKNOWN_OP; panics become E_INTERNAL.
+func dispatch(ctx context.Context, req protocol.Request, logger *log.Logger) (resp protocol.Response) {
 	handler := ops.Lookup(req.Op)
 	if handler == nil {
 		return protocol.ErrorResponse(req.ID, protocol.ErrCodeUnknownOp,
@@ -95,6 +121,64 @@ func dispatch(ctx context.Context, body []byte, logger *log.Logger) (resp protoc
 	}()
 
 	return handler(ctx, req)
+}
+
+// runStreamHandler is the goroutine body for a streaming op. It sets up a
+// cancellable child context, registers it under the job ID so the `cancel`
+// op can reach it, feeds `emit` to the handler, and emits the final
+// Response frame on return. Panics are recovered and surfaced as
+// E_INTERNAL on a best-effort basis.
+func runStreamHandler(parentCtx context.Context, req protocol.Request, h ops.StreamHandler, safeOut *protocol.SafeWriter, logger *log.Logger) {
+	opCtx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+	ops.RegisterJob(req.ID, cancel)
+	defer ops.UnregisterJob(req.ID)
+
+	emit := func(evt protocol.EventFrame) error {
+		enc, merr := json.Marshal(evt)
+		if merr != nil {
+			return merr
+		}
+		return safeOut.WriteFrame(enc)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Printf("panic in stream op %q (id=%s): %v\n%s", req.Op, req.ID, r, debug.Stack())
+			resp := protocol.ErrorResponse(req.ID, protocol.ErrCodeInternal,
+				fmt.Sprintf("internal error: %v", r), false)
+			enc, merr := json.Marshal(resp)
+			if merr != nil {
+				enc = fallbackEncoded()
+			}
+			_ = safeOut.WriteFrame(enc)
+		}
+	}()
+
+	resp := h(opCtx, req, emit)
+	enc, merr := json.Marshal(resp)
+	if merr != nil {
+		logger.Printf("encode stream response: %v", merr)
+		enc = fallbackEncoded()
+	}
+	if werr := safeOut.WriteFrame(enc); werr != nil {
+		logger.Printf("write stream response: %v", werr)
+	}
+}
+
+// writeResp encodes resp and pushes it through the SafeWriter. It falls
+// back to a hand-rolled error frame when encoding fails so that the wire
+// never sees a truncated/empty frame.
+func writeResp(safeOut *protocol.SafeWriter, resp protocol.Response, logger *log.Logger) error {
+	enc, err := json.Marshal(resp)
+	if err != nil {
+		logger.Printf("encode response: %v", err)
+		enc = fallbackEncoded()
+	}
+	if err := safeOut.WriteFrame(enc); err != nil {
+		return fmt.Errorf("write frame: %w", err)
+	}
+	return nil
 }
 
 // fallbackEncodedLiteral is returned when json.Marshal(Response) itself fails

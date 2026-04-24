@@ -13,10 +13,18 @@ interface Props {
 // cross-platform.
 const FORBIDDEN = /[\\/:*?"<>|]/;
 
+// Null byte and C0 control characters (0x00-0x1F). Go's safety.CleanPath
+// rejects these too, but blocking them in the UI gives immediate feedback
+// instead of a cryptic round-trip error when a user pastes stray \0 or
+// embedded newlines from the clipboard.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x00-\x1F]/;
+
 function validate(name: string): string | null {
   if (name.length === 0) return "이름을 입력하세요";
   if (name !== name.trim()) return "앞뒤 공백은 사용할 수 없습니다";
   if (FORBIDDEN.test(name)) return "\\ / : * ? \" < > | 는 사용할 수 없습니다";
+  if (CONTROL_CHARS.test(name)) return "제어 문자(개행/탭 등)는 사용할 수 없습니다";
   if (name === "." || name === "..") return "'.' 또는 '..'는 사용할 수 없습니다";
   return null;
 }

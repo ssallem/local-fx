@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"sync"
 )
 
 // MaxFrameSize is the largest allowed frame body, in bytes.
@@ -70,3 +71,33 @@ func Encode(v any) ([]byte, error) { return json.Marshal(v) }
 
 // Decode unmarshals a frame body into v.
 func Decode(body []byte, v any) error { return json.Unmarshal(body, v) }
+
+// SafeWriter serialises concurrent WriteFrame calls against a single
+// io.Writer. Phase 2.3 streaming ops run in their own goroutines and may emit
+// event frames while the main dispatch loop is simultaneously writing a
+// response for another request; on Windows especially, POSIX atomicity for
+// a single Write past the pipe buffer is NOT guaranteed, so a mutex is the
+// only portable way to keep frames from interleaving on the wire.
+//
+// The mutex is held only for the duration of the underlying Write. All JSON
+// marshaling happens outside the critical section (the caller passes a
+// pre-marshaled body), so even a slow encoder can't block other emitters.
+type SafeWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+// NewSafeWriter wraps w so that concurrent WriteFrame calls serialise. The
+// wrapper is a pointer type because mutex values must not be copied.
+func NewSafeWriter(w io.Writer) *SafeWriter {
+	return &SafeWriter{w: w}
+}
+
+// WriteFrame emits body as a length-prefixed frame through the wrapped writer
+// under the shared mutex. Any error from the underlying Write is surfaced
+// verbatim.
+func (sw *SafeWriter) WriteFrame(body []byte) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	return WriteFrame(sw.w, body)
+}

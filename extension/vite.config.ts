@@ -11,7 +11,8 @@ export default defineConfig({
     react(),
     viteStaticCopy({
       targets: [
-        { src: "manifest.json", dest: "." }
+        { src: "manifest.json", dest: "." },
+        { src: "public/icons/*", dest: "icons" }
       ]
     })
   ],

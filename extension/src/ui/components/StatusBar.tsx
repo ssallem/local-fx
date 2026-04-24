@@ -11,6 +11,7 @@ export function StatusBar(): JSX.Element {
   const loadMore = useExplorerStore((s) => s.loadMore);
   const currentPath = useExplorerStore((s) => s.currentPath);
   const driveCount = useExplorerStore((s) => s.drives.length);
+  const selectionCount = useExplorerStore((s) => s.selectedIndices.size);
 
   if (currentPath === null) {
     return (
@@ -26,6 +27,7 @@ export function StatusBar(): JSX.Element {
     <footer className="statusbar">
       <span>
         {entries.length} of {total} items • Page {page}
+        {selectionCount > 0 ? ` • ${selectionCount} selected` : ""}
       </span>
       {hasMore && (
         <button

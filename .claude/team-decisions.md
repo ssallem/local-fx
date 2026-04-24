@@ -202,6 +202,84 @@ Frame: [uint32 LE length][UTF-8 JSON body]  (Chrome Native Messaging 표준)
 - `sortField="type"` UI 미노출 (헤더 컬럼에 type 없음)
 - "unsorted" 상태 미지원 (asc↔desc 토글만)
 - 다운로드 기능 (Phase 3+ 로드맵 후보)
+
+## 미션 6 (2026-04-22 밤): 잔여 전량 진행
+- **원본 요청:** "P2.2 + P2.3 + P2.4 + WARNING 잔여 4건 전부 진행해줘. 내일 일어나서 확인. 완료 시 한국 시간 표시"
+- **범위:**
+  - P2.2: 컨텍스트 메뉴 + 다중 선택 + 클립보드(Ctrl+C/X/V) + revealEntry UI 진입점
+  - P2.3: 스트리밍 copy + 진행률 토스트 + 취소 + background.ts Event 라우팅
+  - P2.4: move + 충돌 3경로 + 부분 실패 요약 + 디렉터리 재귀
+  - WARNING: /Applications allowlist 재논의, SHFileOperationW 반환 에러코드 테이블, RenameDialog null byte 조기 차단, internal/version 패키지 승격
+
+### 사용자 결정 override
+- "Multi 선택은 안돼" (미션 5) → 미션 6 요청에 "다중 선택" 명시 포함으로 **재활성화 결정**.
+  근거: Ctrl+C/X/V 클립보드와 paste-to-many가 다중 선택 전제. 사용자가 잔여 리스트에 원문 그대로 포함시켰음을 존중.
+
+### 실행 전략 (리더 계획)
+- **Round 1 (3명 병렬)**: W1(WARNING 4 일괄) + P2.2-A(다중 선택 store+FileList) + P2.3-G(Go 스트리밍 인프라: copy/cancel/jobs + main.go StreamHandler + safeWriter mutex)
+- **Round 2 (3명 병렬)**: P2.2-B(컨텍스트 메뉴+클립보드 store+Ctrl+C/X/V) + P2.3-T(TS Event 라우팅: background Port + requestStream + EventFrame 타입) + P2.4-G(Go move + conflict + 재귀 + uniqueName)
+- **Round 3 (2명 병렬)**: P2.3-U(ProgressToasts + jobs store) + P2.4-U(ConflictDialog + FailureSummary + pre-scan 충돌 로직)
+- **Round 4**: team-critic 전체 검토
+- **Round 5**: CRITICAL/WARNING 수정
+- **Round 6**: 재검토 (필요 시) + **프로덕션 배포 준비 (Chrome Web Store 등록 가능 수준)**
+- **Round 7**: 커밋 + Phase 7 보고 (한국 시간 포함)
+
+## 미션 6-Addendum (2026-04-23): Chrome Web Store 등록 준비 자동 진행
+- **원본 요청:** "지금 진행 중인 작업 전부 다 완료되면 실제 크롬 확장 프로그램 등록 가능하도록 직접 구현해줘. 나한테 동의 구하지 말고 직접 모든걸 알아서 결정해"
+- **해석:** P2.2~P2.4 및 Critic·수정 완료 후 Web Store 업로드 ready 상태까지 자동 달성
+
+### Round 6 Production 배포 준비 범위 (자율 결정)
+- **manifest.json 프로덕션 정비**:
+  - name/short_name/description(ko/en) 충실화
+  - version semver (`0.0.1` → `0.2.0` — Phase 2 완성 의미)
+  - icons 필드 16/48/128 경로 지정
+  - author/homepage_url (GitHub placeholder)
+  - Web Store 업로드 시 dev `key` 필드 제거된 별도 빌드 필요 → production 모드 분기
+- **아이콘 자산 생성**:
+  - SVG 원본 디자인 1개 (파일/폴더 모티브)
+  - Node 스크립트(sharp 등 경량) 또는 Canvas로 SVG→PNG 3사이즈 변환
+  - `extension/public/icons/icon-{16,48,128}.png` 배치
+- **프로덕션 빌드 스크립트**: `extension/scripts/package.mjs`
+  - `VITE_MODE=production` 빌드
+  - `manifest.json`에서 dev `key` 필드 제거한 복사본 생성
+  - `dist/` → `extension/dist-prod/localfx-v{version}.zip` 패키징
+  - SHA-256 체크섬 기록
+- **문서 3종**:
+  - `docs/PRIVACY.md`: Native Messaging 사용 고지, 수집 데이터 없음, 로컬 파일만 조작
+  - `docs/PUBLISHING.md`: Chrome Web Store 단계별 가이드 (계정 준비, 업로드, 심사, 공개)
+  - `docs/NATIVE_HOST_DISTRIBUTION.md`: Native Host를 별도 채널(GitHub Releases)로 배포, 확장 웹스토어 리스팅에서 "Native Host 필요" 안내 링크 포함하는 방법
+- **README.md 갱신**: 프로젝트 루트 README — 설치·개발·배포·라이선스 전체 요약
+- **package.json scripts**:
+  - `npm run package` → production zip 생성
+  - `npm run build:prod` → production vite build
+- **Store Listing Assets 폴더** (`store-assets/`):
+  - promotional tile (440x280) — placeholder SVG
+  - screenshot 템플릿 안내 (실제 캡처는 사용자가 제공해야 함 — README에 위치 명시)
+
+### Round 1 진행 상황
+- **[W1 완료]** /Applications allowlist / SHFileOperationW DE_* 24개 매핑 / RenameDialog 제어문자 차단 / `internal/version` 패키지 승격 (Version=0.0.2, MaxProtocolVersion=2). +5 테스트. go test PASS, go build 3.8MB. 부가 발견: App.tsx tsc 21건 에러는 P2.2-A 중간 상태 (해결 완료).
+- **[P2.2-A 완료]** `selectedIndex: number` → `selectedIndices: Set<number>` + `lastAnchorIndex`. 신규 액션 5개 (selectOnly/selectRange/toggleSelect/selectAll/clearSelection). FileList `applyClickSelection`(Shift/Ctrl 분기), App.tsx 키바인딩 재설계(Ctrl+A/Esc/Shift+Arrow), StatusBar에 선택 개수 표시. scrollIntoView는 anchor 기준. navigate/reload/goHome 등에서 세트+앵커 리셋. tsc PASS, vite build PASS. 4 동작 자체 점검 전부 PASS.
+- **[P2.3-G 완료]** 파일 아티팩트 확인: `internal/ops/{copy.go, cancel.go, jobs.go}` 신규 생성. `main.go`, `codec.go`, `types.go`, `registry.go` 수정. `internal/version/` 패키지 생성. Round 1 완료.
+
+### Round 2 완료
+- **[P2.2-B 완료]** ContextMenu.tsx / clipboard.ts 신규. App.tsx/FileList.tsx/App.css 수정. 우클릭 메뉴 2 variant + Ctrl+C/X/V + revealEntry UI 진입점. Paste는 P2.4-U에서 배선.
+- **[P2.3-T 완료]** background.ts / shared.ts 확장. EventFrame/ProgressPayload/DonePayload 타입 + Op 유니온 11개(copy/cancel 추가) + requestStream/copyFile/cancel 헬퍼 + event broadcast 라우팅.
+- **[P2.4-G 복구 완료]** Claude limit 중단 후 재실행. `move.go`, `rename_util.go`, `move_test.go`, `rename_util_test.go` 신규. `registry.go`에 Move 등록. `copy_test.go` Phase 2.4 지원 반영 갱신. `go test 146 PASS`, `go vet clean`, `go build OK`.
+
+### Round 3 진행
+- **[P2.3-U 완료]** jobs store (`store/jobs.ts`) + `ProgressToasts.tsx` 컴포넌트 + App.tsx 마운트 + App.css 스타일. **중요 발견**: P2.3-T가 limit로 `ipc.ts`에 requestStream/copyFile/cancel 헬퍼와 streamListeners 라우팅을 미완성했음. P2.3-U가 이를 대신 완성 (+ moveFile 추가). `startCopyJob/startMoveJob` 헬퍼로 jobs store 자동 연결. tsc PASS, vite build 성공 (JS 181KB gzip 58KB).
+- **[P2.4-U 완료]** Op 유니온 12개 (move 추가), MoveArgs, moveFile 헬퍼. ConflictDialog (focus-trap, 3-button, applyToAll), FailureSummary (sticky 테이블). paste 배선 완전 구현: pre-scan → conflict 순차 resolve → dispatch. FailureSummary 자동 트리거 (useJobs.subscribe). tsc PASS, vite 189KB gzip 60KB.
+
+### Round 3 완료 — 전 단계 build 검증
+- tsc --noEmit: PASS (strict + exactOptionalPropertyTypes)
+- vite build: 65 modules, 606ms
+- go test ./...: 146 PASS, go vet clean, go build OK
+
+### Round 6 제외 (현실적 한계)
+- 실제 프로덕션 서명 (Authenticode/Developer ID) — 유료 인증서 필요, 사용자가 별도 진행
+- Chrome Web Store 개발자 등록 수수료 $5 — 사용자 계정 필요
+- 실제 스크린샷 이미지 (실행 중인 확장 캡처 5장 필요) — 사용자가 로컬에서 촬영
+- macOS .pkg 서명/공증 — Apple Developer 계정 필요
 - **[Phase 6 Round 2 — 신규 CRITICAL 수정 (개발자 8)]**
   - N-1: TS `ErrorCode` 유니온에 `E_UNKNOWN_OP`/`E_BAD_REQUEST`/`E_INTERNAL` 3개 추가 → 총 22개(§8 20 + transport-local 2)
   - N-1: PROTOCOL.md §8에 3개 행 + 서두 총개수 20 명시

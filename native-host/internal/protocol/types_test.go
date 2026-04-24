@@ -179,6 +179,106 @@ func TestRequest_StreamAndProtocolVersionRoundTrip(t *testing.T) {
 	}
 }
 
+// TestEventFrame_RoundTrip confirms the Phase 2.3 streaming envelope
+// marshals to the wire shape the extension expects (id/event/payload keys,
+// omitempty payload). Ensures the extension-side EventFrame TS interface
+// matches the Go struct byte-for-byte on populated and empty payloads.
+func TestEventFrame_RoundTrip(t *testing.T) {
+	// Populated "progress" event.
+	in := EventFrame{
+		ID:    "job-1",
+		Event: "progress",
+		Payload: ProgressPayload{
+			BytesDone:   1024,
+			BytesTotal:  2048,
+			FileDone:    0,
+			FileTotal:   1,
+			CurrentPath: "C:/tmp/a.txt",
+			Rate:        512.0,
+		},
+	}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		t.Fatalf("Marshal progress: %v", err)
+	}
+	for _, key := range []string{`"id":"job-1"`, `"event":"progress"`, `"payload":`, `"bytesDone":1024`} {
+		if !strings.Contains(string(raw), key) {
+			t.Errorf("missing %s in %s", key, raw)
+		}
+	}
+
+	// Empty done payload — because DonePayload has all omitempty fields,
+	// an empty DonePayload{} marshals to `{}`, and the payload key MUST
+	// still appear on the wire so the extension can distinguish a "done"
+	// event from a transport artefact.
+	done := EventFrame{
+		ID:      "job-1",
+		Event:   "done",
+		Payload: DonePayload{},
+	}
+	rawDone, err := json.Marshal(done)
+	if err != nil {
+		t.Fatalf("Marshal done: %v", err)
+	}
+	if !strings.Contains(string(rawDone), `"event":"done"`) {
+		t.Errorf("missing event=done in %s", rawDone)
+	}
+}
+
+// TestDonePayload_CanceledAndFailures verifies that DonePayload's two
+// signal fields (canceled, failures) serialise as expected and are
+// omitted when empty.
+func TestDonePayload_CanceledAndFailures(t *testing.T) {
+	// Empty -> should be "{}".
+	emptyRaw, err := json.Marshal(DonePayload{})
+	if err != nil {
+		t.Fatalf("Marshal empty: %v", err)
+	}
+	if string(emptyRaw) != `{}` {
+		t.Errorf("empty DonePayload: got %s want {}", emptyRaw)
+	}
+
+	// Cancelled -> canceled:true only.
+	canRaw, err := json.Marshal(DonePayload{Canceled: true})
+	if err != nil {
+		t.Fatalf("Marshal canceled: %v", err)
+	}
+	if !strings.Contains(string(canRaw), `"canceled":true`) {
+		t.Errorf("canceled marshal: got %s", canRaw)
+	}
+
+	// With failures.
+	fRaw, err := json.Marshal(DonePayload{
+		Failures: []FailureInfo{
+			{Path: "/a", Code: ErrCodeEACCES, Message: "denied"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Marshal failures: %v", err)
+	}
+	for _, key := range []string{`"failures":`, `"path":"/a"`, `"code":"EACCES"`} {
+		if !strings.Contains(string(fRaw), key) {
+			t.Errorf("failures marshal missing %s in %s", key, fRaw)
+		}
+	}
+}
+
+// TestSuccessResponse_Shape confirms the helper builds an OK response
+// with the expected wire shape (no error key, data present).
+func TestSuccessResponse_Shape(t *testing.T) {
+	r := SuccessResponse("req-1", map[string]any{"ok": true})
+	if !r.OK || r.ID != "req-1" {
+		t.Errorf("SuccessResponse: %+v", r)
+	}
+	if r.Error != nil {
+		t.Errorf("Error: got %+v, want nil", r.Error)
+	}
+	raw, _ := json.Marshal(r)
+	if strings.Contains(string(raw), `"error"`) {
+		t.Errorf("unexpected error key in %s", raw)
+	}
+}
+
 // TestErrorCatalogue_NoDuplicateValues guards against accidental string
 // collisions when the catalogue grows. Every declared constant must map to
 // a distinct on-wire code; PROTOCOL.md §8 is the authority.

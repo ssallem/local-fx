@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="22" fill="#0066cc"/>
+  <!-- Folder back -->
+  <path d="M24 42 L24 96 Q24 102 30 102 L98 102 Q104 102 104 96 L104 56 Q104 50 98 50 L60 50 L52 42 Z"
+        fill="#ffffff" opacity="0.95"/>
+  <!-- Document on top -->
+  <rect x="40" y="30" width="36" height="44" rx="3" fill="#ffffff"/>
+  <line x1="46" y1="42" x2="70" y2="42" stroke="#0066cc" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46" y1="50" x2="70" y2="50" stroke="#0066cc" stroke-width="2" stroke-linecap="round"/>
+  <line x1="46" y1="58" x2="62" y2="58" stroke="#0066cc" stroke-width="2" stroke-linecap="round"/>
+</svg>

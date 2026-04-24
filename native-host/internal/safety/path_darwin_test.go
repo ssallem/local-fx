@@ -22,12 +22,19 @@ func TestIsSystemPath_Darwin(t *testing.T) {
 		{"/private/var", "/private/var", true},
 		{"/bin/sh", "/bin/sh", true},
 		{"/sbin/launchd", "/sbin/launchd", true},
+		// /Applications (W1-1): third-party .app bundles need the same
+		// protection — mutating Contents/MacOS breaks code signing.
+		{"/Applications Safari bundle plist", "/Applications/Safari.app/Contents/Info.plist", true},
+		{"/Applications third-party bundle", "/Applications/MyCustomApp.app", true},
 
 		// negative — boundary (case-sensitive on macOS)
 		{"/usr2", "/usr2", false},
 		{"/usr2/foo", "/usr2/foo/bar", false},
 		{"/Systems", "/Systems/x", false},
 		{"/USR", "/USR/bin", false}, // wrong case, no match
+		// /Applications prefix collisions must not match.
+		{"/ApplicationsOther boundary", "/ApplicationsOther", false},
+		{"/ApplicationsOther/sub boundary", "/ApplicationsOther/sub", false},
 
 		// negative — user data
 		{"/Users/me", "/Users/me/Documents", false},

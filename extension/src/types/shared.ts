@@ -3,10 +3,15 @@ export const HOST_NAME = "com.local.fx" as const;
 // Phase 1: ping (Phase 0) + listDrives / readdir / stat are live.
 // Phase 2.1: non-streaming mutation ops (mkdir, rename, remove, open,
 // revealInOsExplorer) added — Host bumped hostMaxProtocolVersion to 2.
-// Remaining ops (writeFile, readFile, copy, move, search, cancel) are
-// defined in PROTOCOL.md §5/§7 and land in Phase 3. Keep this union in
-// lock-step with the Go dispatcher's registered handler table
-// (native-host/internal/ops).
+// Phase 2.3: streaming copy + cancel added.
+// Phase 2.4: streaming move added (cross-volume safe; intra-volume falls
+// back to fast OS rename inside the Host). Args mirror CopyArgs with the
+// caveat that conflict="prompt" is REJECTED by the Host — UI must resolve
+// conflicts up front and pass overwrite|skip|rename. Data is EmptyData;
+// per-path failures arrive on the terminal "done" event just like copy.
+// Remaining ops (writeFile, readFile, search) are defined in PROTOCOL.md
+// §5/§7 and land in later phases. Keep this union in lock-step with the
+// Go dispatcher's registered handler table (native-host/internal/ops).
 export type Op =
   | "ping"
   | "listDrives"
@@ -17,7 +22,12 @@ export type Op =
   | "rename"
   | "remove"
   | "open"
-  | "revealInOsExplorer";
+  | "revealInOsExplorer"
+  // Phase 2.3 — streaming copy + its companion control op
+  | "copy"
+  | "cancel"
+  // Phase 2.4 — streaming move (UI-resolved conflicts)
+  | "move";
 
 export interface Request<T = unknown> {
   id: string;
@@ -277,6 +287,132 @@ export interface RevealArgs {
 export type EmptyData = Record<string, never>;
 
 // -----------------------------------------------------------------------------
+// 7.10 copy (Phase 2.3, streaming) + 7.13 cancel
+//
+// Wire-level authority:
+//   - Go: native-host/internal/ops/copy.go (streaming implementation) and
+//     native-host/internal/ops/cancel.go (control op)
+//   - Spec: PROTOCOL.md §7.10 (copy) / §7.13 (cancel) / §6 (streaming rules)
+//
+// Copy is a STREAMING op: the final Response is always `{ ok: true, data: {} }`
+// on success, and the actual outcome (per-path failures, cancellation flag) is
+// reported through the terminal "done" EventFrame emitted BEFORE that
+// response. On hard failure (src missing, permission denied on root, etc.) the
+// Host skips the "done" event and returns `{ ok: false, error: ... }` in the
+// usual shape. Callers that want the granular result MUST subscribe to the
+// event stream via `requestStream("copy", ...)` in ipc.ts.
+// -----------------------------------------------------------------------------
+
+// PROTOCOL.md §7.10 — `prompt` is spec-defined but Phase 2.3 treats it as a
+// caller-side responsibility: the UI resolves conflicts up front and passes
+// one of "overwrite" | "skip" | "rename" to the Host. Keeping "prompt" in
+// the union documents the wire grammar but the Host's default is "skip".
+export type ConflictStrategy = "overwrite" | "skip" | "rename" | "prompt";
+
+export interface CopyArgs {
+  src: string;
+  dst: string;
+  // Convenience flag equivalent to `conflict: "overwrite"`. Kept for wire
+  // parity with the spec example; `conflict` wins when both are set.
+  overwrite?: boolean;
+  // System-path guard (PROTOCOL.md §10). Required when src or dst resolves
+  // under a protected root; omitted otherwise to match the guard policy
+  // shared with the Phase 2.1 mutation ops.
+  explicitConfirm?: boolean;
+  // Default on the Host side is "skip". See ConflictStrategy for the full
+  // grammar and the Phase 2.3 "prompt is resolved UI-side" caveat.
+  conflict?: ConflictStrategy;
+}
+
+// PROTOCOL.md §7.12 (Phase 2.4) — streaming move. Wire shape mirrors
+// CopyArgs but the Host explicitly REJECTS `conflict: "prompt"` with a
+// BadRequest. The UI is responsible for pre-scanning the destination and
+// resolving each conflict before issuing the move (see ConflictDialog +
+// pasteClipboard in App.tsx). The TS type narrows `conflict` accordingly
+// so callers cannot accidentally hand the Host a value it would reject.
+export interface MoveArgs {
+  src: string;
+  dst: string;
+  // Convenience flag equivalent to `conflict: "overwrite"`. Wins over the
+  // narrower `conflict` field only when conflict is omitted, matching the
+  // CopyArgs precedence rule on the Host side.
+  overwrite?: boolean;
+  // System-path guard (PROTOCOL.md §10) — same semantics as CopyArgs.
+  explicitConfirm?: boolean;
+  // Excludes "prompt" because the Go Host rejects it with BadRequest. The
+  // UI must resolve conflicts before the request leaves this layer.
+  conflict?: Exclude<ConflictStrategy, "prompt">;
+}
+
+// PROTOCOL.md §7.13 — cancel targets an IN-FLIGHT streaming op by its id.
+// The cancel request itself is a normal non-streaming op: it returns a
+// Response with `accepted` indicating whether the Host actually knew about
+// `targetId`. The targeted op then emits its terminal "done" event with
+// `payload.canceled: true`.
+export interface CancelArgs {
+  targetId: string;
+}
+
+export interface CancelData {
+  accepted: boolean;
+}
+
+// -----------------------------------------------------------------------------
+// Streaming event frames — PROTOCOL.md §6.
+//
+// Authority on the Go side: native-host/internal/protocol/types.go
+// (EventFrame, ProgressPayload, DonePayload, FailureInfo). Field name casing
+// below mirrors the `json:"..."` tags there exactly; any rename is a
+// cross-language bug.
+//
+// StreamEvent is a discriminated union keyed on `event` so `switch` arms
+// are exhaustive-checked. `id` on every frame MUST match the originating
+// copy/move/search request id (PROTOCOL.md §6) — the routing layer in
+// background.ts / ipc.ts relies on that correlation.
+// -----------------------------------------------------------------------------
+
+export interface ProgressPayload {
+  bytesDone: number;
+  bytesTotal: number;
+  fileDone: number;
+  fileTotal: number;
+  // Optional to mirror Go's `omitempty` — the Host drops these fields when
+  // they would be the zero value rather than sending `""` / `0`.
+  currentPath?: string;
+  rate?: number; // bytes/sec averaged over the recent emit window
+}
+
+// PROTOCOL.md §7.10 lists `"ok" | "failed"` on the wire, but Phase 2.3 uses
+// the richer {"done" | "skipped" | "failed"} trio so that conflict-skip is
+// distinguishable from successful completion. Keep this in step with the
+// Go emitter if/when it starts producing per-entry "item" frames (copy.go
+// currently emits only progress + done; item is reserved for search and
+// for the future granular copy telemetry).
+export interface ItemPayload {
+  path: string;
+  status: "done" | "skipped" | "failed";
+  error?: { code: ErrorCode; message: string };
+}
+
+export interface FailureInfo {
+  path: string;
+  code: ErrorCode;
+  message: string;
+}
+
+export interface DonePayload {
+  // `omitempty` on the Go side: absent means "not canceled".
+  canceled?: boolean;
+  // `omitempty` on the Go side: absent means "no partial failures".
+  failures?: FailureInfo[];
+}
+
+export type StreamEvent =
+  | { id: string; event: "progress"; payload: ProgressPayload }
+  | { id: string; event: "item"; payload: ItemPayload }
+  | { id: string; event: "done"; payload: DonePayload };
+
+// -----------------------------------------------------------------------------
 // op → args / data mapping tables.
 //
 // These power the type-safe `request<O>(op, args)` overloads in ipc.ts so
@@ -297,6 +433,11 @@ export interface OpArgsMap {
   remove: RemoveArgs;
   open: OpenArgs;
   revealInOsExplorer: RevealArgs;
+  // Phase 2.3 — streaming copy + control op
+  copy: CopyArgs;
+  cancel: CancelArgs;
+  // Phase 2.4 — streaming move (UI-resolved conflicts)
+  move: MoveArgs;
 }
 
 export interface OpDataMap {
@@ -310,6 +451,12 @@ export interface OpDataMap {
   remove: EmptyData;
   open: EmptyData;
   revealInOsExplorer: EmptyData;
+  // Phase 2.3. The final Response for copy is `{ ok: true, data: {} }`
+  // on success; the real outcome is on the terminal "done" StreamEvent.
+  copy: EmptyData;
+  cancel: CancelData;
+  // Phase 2.4 — same envelope/event shape as copy.
+  move: EmptyData;
 }
 
 // Ops that accept no args (or only an optional args payload). Used by the

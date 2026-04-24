@@ -434,6 +434,81 @@ button:disabled {
 
 .filelist-row-dir .filelist-label { font-weight: 500; }
 
+/* Cut-pending: visual hint that a row is queued for move-on-paste. Opacity
+   is additive with .filelist-row-hidden, but both capping at 0.5 means the
+   worst case is still readable. */
+.filelist-row.cut-pending { opacity: 0.5; }
+
+/* ------------------------------------------------------------ Context menu */
+
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  min-width: 200px;
+  padding: 4px 0;
+  user-select: none;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  cursor: pointer;
+  gap: 16px;
+}
+
+.context-menu-item.active:not(.disabled),
+.context-menu-item:hover:not(.disabled) {
+  background: var(--row-selected);
+}
+
+.context-menu-item.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.context-menu-item.danger { color: #d63939; }
+.context-menu-item.danger.active:not(.disabled),
+.context-menu-item.danger:hover:not(.disabled) {
+  background: #ffe5e5;
+  color: #d63939;
+}
+
+@media (prefers-color-scheme: dark) {
+  .context-menu-item.danger.active:not(.disabled),
+  .context-menu-item.danger:hover:not(.disabled) {
+    background: #4a1f1f;
+    color: #ff8a8a;
+  }
+}
+
+.context-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-shortcut {
+  color: var(--fg-muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
 /* ------------------------------------------------------------ Status bar */
 
 .statusbar {
@@ -672,4 +747,278 @@ button:disabled {
   color: #d63939;
   font-size: 12px;
   margin-bottom: 8px;
+}
+
+/* -------------------------------------------------------------------------
+   Phase 2.3 — ProgressToasts (bottom-right job stack)
+   ------------------------------------------------------------------------- */
+
+.progress-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 150;
+  max-width: 360px;
+  pointer-events: none;
+}
+
+.progress-toast {
+  background: var(--bg, white);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  color: var(--fg);
+  pointer-events: auto;
+}
+
+.progress-toast.state-done {
+  border-color: #28a745;
+}
+
+.progress-toast.state-canceled {
+  border-color: #888;
+}
+
+.progress-toast.state-failed {
+  border-color: #d63939;
+}
+
+.progress-toast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-toast-label {
+  flex: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress-toast-state {
+  color: var(--fg-muted, #888);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-toast-close {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted, #888);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.progress-toast-close:hover {
+  color: var(--fg);
+}
+
+.progress-toast-body {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent, #0066cc);
+  transition: width 0.15s ease-out;
+}
+
+.progress-toast-meta {
+  display: flex;
+  gap: 8px;
+  color: var(--fg-muted, #666);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-toast-path {
+  color: var(--fg-muted, #666);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.progress-toast-cancel {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.progress-toast-cancel:hover {
+  background: var(--row-hover);
+}
+
+.progress-toast-error {
+  margin-top: 6px;
+  color: #d63939;
+}
+
+.progress-toast-failures {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.progress-toast-failures summary {
+  cursor: pointer;
+  color: var(--fg-muted, #888);
+}
+
+.progress-toast-failures ul {
+  margin: 4px 0 0 0;
+  padding-left: 16px;
+}
+
+.progress-toast-failures code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 3px;
+  border-radius: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  .progress-bar {
+    background: #2a2a2a;
+  }
+  .progress-toast-failures code {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Phase 2.4 — ConflictDialog (paste pre-scan resolver)
+   ------------------------------------------------------------------------- */
+
+.conflict-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.conflict-compare-side {
+  padding: 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.conflict-compare-side h4 {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  color: var(--fg-muted, #666);
+}
+
+.conflict-compare-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+
+.conflict-compare-meta {
+  font-size: 11px;
+  color: var(--fg-muted, #666);
+  line-height: 1.5;
+}
+
+.conflict-remaining {
+  margin-bottom: 8px;
+  color: var(--fg-muted, #888);
+  font-size: 11px;
+}
+
+.conflict-apply-all {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .conflict-compare-side {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Phase 2.4 — FailureSummary (post-job results table)
+   ------------------------------------------------------------------------- */
+
+.failure-list {
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 12px 0;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+}
+
+.failure-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.failure-list th {
+  position: sticky;
+  top: 0;
+  background: var(--header-bg, #f6f7f9);
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #ddd);
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.failure-list td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.failure-list td code {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .failure-list td {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
+  .failure-list td code {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestWriteReadFrame_RoundTrip(t *testing.T) {
@@ -129,6 +131,89 @@ func TestReadFrame_ChunkedReads(t *testing.T) {
 	}
 	if !bytes.Equal(got, body) {
 		t.Errorf("chunked: got %d bytes, want %d", len(got), len(body))
+	}
+}
+
+// slowWriter delays every Write so that two concurrent goroutines hitting
+// the same wrapped io.Writer overlap in time. Without SafeWriter the header
+// bytes from one frame can land between the header and body of another.
+type slowWriter struct {
+	buf   bytes.Buffer
+	delay time.Duration
+}
+
+func (sw *slowWriter) Write(p []byte) (int, error) {
+	if sw.delay > 0 {
+		time.Sleep(sw.delay)
+	}
+	return sw.buf.Write(p)
+}
+
+func TestSafeWriter_SerialisesConcurrentWrites(t *testing.T) {
+	sw := &slowWriter{delay: 2 * time.Millisecond}
+	safe := NewSafeWriter(sw)
+
+	bodies := [][]byte{
+		[]byte(`{"a":1}`),
+		[]byte(`{"b":2}`),
+		[]byte(`{"c":3}`),
+		[]byte(`{"d":4}`),
+		[]byte(`{"e":5}`),
+	}
+
+	var wg sync.WaitGroup
+	for _, body := range bodies {
+		wg.Add(1)
+		go func(b []byte) {
+			defer wg.Done()
+			if err := safe.WriteFrame(b); err != nil {
+				t.Errorf("WriteFrame: %v", err)
+			}
+		}(body)
+	}
+	wg.Wait()
+
+	// Pull all frames back out; they should decode cleanly regardless of
+	// the random write order. Interleaved header+body bytes would fail
+	// the length-prefix read here.
+	reader := bytes.NewReader(sw.buf.Bytes())
+	seen := map[string]bool{}
+	for i := 0; i < len(bodies); i++ {
+		got, err := ReadFrame(reader)
+		if err != nil {
+			t.Fatalf("ReadFrame[%d]: %v", i, err)
+		}
+		seen[string(got)] = true
+	}
+	for _, body := range bodies {
+		if !seen[string(body)] {
+			t.Errorf("missing body on wire: %s", body)
+		}
+	}
+}
+
+func TestSafeWriter_RoundTripSingleFrame(t *testing.T) {
+	var buf bytes.Buffer
+	safe := NewSafeWriter(&buf)
+	body := []byte(`{"id":"x","ok":true}`)
+	if err := safe.WriteFrame(body); err != nil {
+		t.Fatalf("WriteFrame: %v", err)
+	}
+	got, err := ReadFrame(&buf)
+	if err != nil {
+		t.Fatalf("ReadFrame: %v", err)
+	}
+	if !bytes.Equal(got, body) {
+		t.Errorf("round trip: got %q want %q", got, body)
+	}
+}
+
+func TestSafeWriter_OverMaxRejected(t *testing.T) {
+	var buf bytes.Buffer
+	safe := NewSafeWriter(&buf)
+	body := bytes.Repeat([]byte{'a'}, MaxFrameSize+1)
+	if err := safe.WriteFrame(body); !errors.Is(err, ErrFrameTooLarge) {
+		t.Fatalf("SafeWriter over max: err=%v, want ErrFrameTooLarge", err)
 	}
 }
 

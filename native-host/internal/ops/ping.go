@@ -6,24 +6,8 @@ import (
 	"time"
 
 	"local-fx-host/internal/protocol"
+	"local-fx-host/internal/version"
 )
-
-// Version is the host binary version reported by the ping op. Bump on every
-// released build so the extension can detect stale installs.
-//
-// TODO(phase1): promote to a dedicated `internal/version` package so non-op
-// code (installer checks, log prefixes) can reference it without importing
-// the ops package. Kept in ops/ for Phase 0 to minimise surface area.
-const Version = "0.0.1"
-
-// HostMaxProtocolVersion is the highest protocol version this host binary
-// speaks. PROTOCOL.md §7.1 requires the ping response to advertise it so the
-// extension can detect version skew at handshake time.
-//
-// Bumped to 2 for Phase 2.1: the host now understands mkdir/rename/remove/
-// open/revealInOsExplorer. Extensions speaking PROTOCOL_VERSION=1 still work
-// for the Phase 0/1 read-only op subset.
-const HostMaxProtocolVersion = 2
 
 // Ping is a liveness/identity probe used during extension <-> host handshake.
 // It intentionally takes no arguments so it can double as the smoke test in
@@ -33,6 +17,10 @@ const HostMaxProtocolVersion = 2
 // Phase 1 handshake trio (`hostVersion`, `hostMaxProtocolVersion`, `serverTs`)
 // so older extensions keep working while new ones can negotiate properly.
 // See PROTOCOL.md §7.1.
+//
+// Version metadata lives in internal/version (promoted out of this file in
+// W1-4) so installer / log prefix / future health endpoints can reference it
+// without importing ops.
 func Ping(_ context.Context, req protocol.Request) protocol.Response {
 	return protocol.Response{
 		ID: req.ID,
@@ -40,12 +28,12 @@ func Ping(_ context.Context, req protocol.Request) protocol.Response {
 		Data: map[string]any{
 			// Legacy fields — retained for backward compatibility.
 			"pong":    true,
-			"version": Version,
+			"version": version.Version,
 			"os":      runtime.GOOS,
 			"arch":    runtime.GOARCH,
 			// Phase 1 handshake fields (PROTOCOL.md §7.1).
-			"hostVersion":            Version,
-			"hostMaxProtocolVersion": HostMaxProtocolVersion,
+			"hostVersion":            version.Version,
+			"hostMaxProtocolVersion": version.MaxProtocolVersion,
 			"serverTs":               time.Now().UnixMilli(),
 		},
 	}

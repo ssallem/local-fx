@@ -175,7 +175,11 @@ export interface ExplorerState {
   error: IpcError | null;
   history: string[]; // each entry is a path string; `null` (root) not stored
   historyIndex: number; // -1 = no history, else pointer into `history`
-  selectedIndex: number; // -1 = no row selected
+  // Multi-selection. Set chosen over Array for O(1) has/add/delete and
+  // size-as-"count". Treat as immutable — always `new Set(prev)` on mutation
+  // so Zustand's reference-equality subscribers re-render.
+  selectedIndices: Set<number>; // empty = nothing selected
+  lastAnchorIndex: number; // -1 = no anchor. Shift+Click range pivot.
   pendingConfirm: PendingConfirm | null;
 
   // --- Phase 2.2 UI polish — sort + column layout ------------------------
@@ -193,7 +197,20 @@ export interface ExplorerState {
   loadMore: () => Promise<void>;
   reload: () => Promise<void>;
   goHome: () => void;
-  setSelectedIndex: (i: number) => void;
+  // --- Selection actions ---
+  // Replace selection with {i} and set anchor = i. Mirrors the old
+  // setSelectedIndex() semantics — callers that just want "pick this row".
+  selectOnly: (i: number) => void;
+  // Extend selection from anchor to toIndex (inclusive). Replaces any prior
+  // selection. No-op anchor stays put (Shift+Click keeps the pivot).
+  // If no anchor is set, behaves like selectOnly(toIndex).
+  selectRange: (toIndex: number) => void;
+  // Toggle membership of i and move anchor to i. Ctrl+Click semantics.
+  toggleSelect: (i: number) => void;
+  // Select every current entry; anchor = 0. No-op if entries empty.
+  selectAll: () => void;
+  // Clear selection and anchor.
+  clearSelection: () => void;
   clearError: () => void;
 
   // Phase 2.2 UI polish
@@ -246,7 +263,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   error: null,
   history: [],
   historyIndex: -1,
-  selectedIndex: -1,
+  selectedIndices: new Set<number>(),
+  lastAnchorIndex: -1,
   pendingConfirm: null,
 
   sortField: "name",
@@ -265,7 +283,12 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
   },
 
   async navigate(path: string) {
-    set({ loading: true, error: null, selectedIndex: -1 });
+    set({
+      loading: true,
+      error: null,
+      selectedIndices: new Set<number>(),
+      lastAnchorIndex: -1
+    });
     try {
       const { sortField, sortOrder } = get();
       const data = await fetchDir(path, {
@@ -313,7 +336,8 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
           entries: [],
           total: 0,
           historyIndex: -1,
-          selectedIndex: -1,
+          selectedIndices: new Set<number>(),
+          lastAnchorIndex: -1,
           error: null
         });
       }
@@ -321,7 +345,12 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     }
     const prev = history[historyIndex - 1];
     if (!prev) return;
-    set({ loading: true, error: null, selectedIndex: -1 });
+    set({
+      loading: true,
+      error: null,
+      selectedIndices: new Set<number>(),
+      lastAnchorIndex: -1
+    });
     try {
       const { sortField, sortOrder } = get();
       const data = await fetchDir(prev, {
@@ -347,7 +376,12 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
     if (historyIndex >= history.length - 1) return;
     const next = history[historyIndex + 1];
     if (!next) return;
-    set({ loading: true, error: null, selectedIndex: -1 });
+    set({
+      loading: true,
+      error: null,
+      selectedIndices: new Set<number>(),
+      lastAnchorIndex: -1
+    });
     try {
       const { sortField, sortOrder } = get();
       const data = await fetchDir(next, {
@@ -404,7 +438,12 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       await get().loadDrives();
       return;
     }
-    set({ loading: true, error: null, selectedIndex: -1 });
+    set({
+      loading: true,
+      error: null,
+      selectedIndices: new Set<number>(),
+      lastAnchorIndex: -1
+    });
     try {
       const { sortField, sortOrder } = get();
       const data = await fetchDir(currentPath, {
@@ -431,13 +470,66 @@ export const useExplorerStore = create<ExplorerState>((set, get) => ({
       page: 1,
       nextCursor: null,
       hasMore: false,
-      selectedIndex: -1,
+      selectedIndices: new Set<number>(),
+      lastAnchorIndex: -1,
       error: null
     });
   },
 
-  setSelectedIndex(i: number) {
-    set({ selectedIndex: i });
+  // --- Selection actions ---
+  // We always allocate a fresh Set so Zustand's ref-equality check fires
+  // subscribers; mutating the existing Set in place would look identical to
+  // React and skip the re-render.
+
+  selectOnly(i: number) {
+    set({ selectedIndices: new Set<number>([i]), lastAnchorIndex: i });
+  },
+
+  selectRange(toIndex: number) {
+    const { lastAnchorIndex } = get();
+    // No anchor → fall back to single-select so the first Shift+Arrow /
+    // Shift+Click from an empty selection still behaves reasonably.
+    if (lastAnchorIndex < 0) {
+      set({
+        selectedIndices: new Set<number>([toIndex]),
+        lastAnchorIndex: toIndex
+      });
+      return;
+    }
+    const lo = Math.min(lastAnchorIndex, toIndex);
+    const hi = Math.max(lastAnchorIndex, toIndex);
+    const next = new Set<number>();
+    for (let i = lo; i <= hi; i += 1) next.add(i);
+    // anchor stays put — that's the whole point of a range pivot.
+    set({ selectedIndices: next });
+  },
+
+  toggleSelect(i: number) {
+    const { selectedIndices } = get();
+    const next = new Set(selectedIndices);
+    if (next.has(i)) {
+      next.delete(i);
+    } else {
+      next.add(i);
+    }
+    // Ctrl+Click re-seats the anchor on the clicked row regardless of
+    // whether it was added or removed; matches native file-manager UX.
+    set({ selectedIndices: next, lastAnchorIndex: i });
+  },
+
+  selectAll() {
+    const { entries } = get();
+    if (entries.length === 0) {
+      set({ selectedIndices: new Set<number>(), lastAnchorIndex: -1 });
+      return;
+    }
+    const next = new Set<number>();
+    for (let i = 0; i < entries.length; i += 1) next.add(i);
+    set({ selectedIndices: next, lastAnchorIndex: 0 });
+  },
+
+  clearSelection() {
+    set({ selectedIndices: new Set<number>(), lastAnchorIndex: -1 });
   },
 
   clearError() {

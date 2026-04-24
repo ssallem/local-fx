@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"local-fx-host/internal/protocol"
+	"local-fx-host/internal/version"
 )
 
 func TestPing(t *testing.T) {
@@ -29,8 +30,8 @@ func TestPing(t *testing.T) {
 	if pong, _ := data["pong"].(bool); !pong {
 		t.Errorf("pong: got %v, want true", data["pong"])
 	}
-	if v, _ := data["version"].(string); v != Version {
-		t.Errorf("version: got %q, want %q", v, Version)
+	if v, _ := data["version"].(string); v != version.Version {
+		t.Errorf("version: got %q, want %q", v, version.Version)
 	}
 	if os, _ := data["os"].(string); os != runtime.GOOS {
 		t.Errorf("os: got %q, want %q", os, runtime.GOOS)
@@ -55,8 +56,8 @@ func TestPing_Phase1HandshakeFields(t *testing.T) {
 	if !ok {
 		t.Fatalf("hostVersion missing or wrong type: got %T (%v)", data["hostVersion"], data["hostVersion"])
 	}
-	if hv != Version {
-		t.Errorf("hostVersion: got %q, want %q", hv, Version)
+	if hv != version.Version {
+		t.Errorf("hostVersion: got %q, want %q", hv, version.Version)
 	}
 
 	// JSON numbers in a map[string]any are float64 after round-trip, but the
@@ -64,12 +65,12 @@ func TestPing_Phase1HandshakeFields(t *testing.T) {
 	// both so the test is robust if we later wrap Ping with a marshal step.
 	switch v := data["hostMaxProtocolVersion"].(type) {
 	case int:
-		if v != HostMaxProtocolVersion {
-			t.Errorf("hostMaxProtocolVersion: got %d, want %d", v, HostMaxProtocolVersion)
+		if v != version.MaxProtocolVersion {
+			t.Errorf("hostMaxProtocolVersion: got %d, want %d", v, version.MaxProtocolVersion)
 		}
 	case float64:
-		if int(v) != HostMaxProtocolVersion {
-			t.Errorf("hostMaxProtocolVersion: got %v, want %d", v, HostMaxProtocolVersion)
+		if int(v) != version.MaxProtocolVersion {
+			t.Errorf("hostMaxProtocolVersion: got %v, want %d", v, version.MaxProtocolVersion)
 		}
 	default:
 		t.Fatalf("hostMaxProtocolVersion missing or wrong type: got %T (%v)", data["hostMaxProtocolVersion"], data["hostMaxProtocolVersion"])
@@ -99,7 +100,14 @@ func TestPing_RegisteredInRegistry(t *testing.T) {
 // version constant itself doubles as the wire-format contract; any future
 // bump MUST update PROTOCOL.md + extension/src/ui/ipc.ts in the same commit.
 func TestPing_HostMaxProtocolVersionIs2(t *testing.T) {
-	if HostMaxProtocolVersion != 2 {
-		t.Errorf("HostMaxProtocolVersion: got %d, want 2 (Phase 2.1 bump)", HostMaxProtocolVersion)
+	if version.MaxProtocolVersion != 2 {
+		t.Errorf("MaxProtocolVersion: got %d, want 2 (Phase 2.1 bump)", version.MaxProtocolVersion)
+	}
+}
+
+// TestPing_VersionIs0_0_2 locks in the Phase 2 completion bump (W1-4).
+func TestPing_VersionIs0_0_2(t *testing.T) {
+	if version.Version != "0.0.2" {
+		t.Errorf("Version: got %q, want %q (Phase 2 completion bump)", version.Version, "0.0.2")
 	}
 }

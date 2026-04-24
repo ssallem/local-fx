@@ -5,6 +5,7 @@ import {
   type ColumnOrder,
   type SortableField
 } from "../store/explorer";
+import { useClipboard } from "../store/clipboard";
 import { formatBytes, formatTime } from "../utils/format";
 
 /**
@@ -81,10 +82,29 @@ type DragHint = {
   side: "before" | "after";
 };
 
-export function FileList(): JSX.Element {
+// Props let App.tsx own the global context-menu state (x/y/variant) while
+// FileList stays focused on rendering + row interaction. Both callbacks are
+// required so FileList never needs to check "is this prop wired?" at runtime.
+export interface FileListProps {
+  onContextMenuRow: (
+    entry: Entry,
+    index: number,
+    clientX: number,
+    clientY: number
+  ) => void;
+  onContextMenuBlank: (clientX: number, clientY: number) => void;
+}
+
+export function FileList({
+  onContextMenuRow,
+  onContextMenuBlank
+}: FileListProps): JSX.Element {
   const entries = useExplorerStore((s) => s.entries);
-  const selectedIndex = useExplorerStore((s) => s.selectedIndex);
-  const setSelectedIndex = useExplorerStore((s) => s.setSelectedIndex);
+  const selectedIndices = useExplorerStore((s) => s.selectedIndices);
+  const lastAnchorIndex = useExplorerStore((s) => s.lastAnchorIndex);
+  const selectOnly = useExplorerStore((s) => s.selectOnly);
+  const selectRange = useExplorerStore((s) => s.selectRange);
+  const toggleSelect = useExplorerStore((s) => s.toggleSelect);
   const navigate = useExplorerStore((s) => s.navigate);
   const openEntry = useExplorerStore((s) => s.openEntry);
   const loading = useExplorerStore((s) => s.loading);
@@ -97,16 +117,24 @@ export function FileList(): JSX.Element {
   const setColumnWidth = useExplorerStore((s) => s.setColumnWidth);
   const setColumnOrder = useExplorerStore((s) => s.setColumnOrder);
 
+  // Cut-mode tint: rows whose absolute path sits in the clipboard while mode
+  // === "cut" render at 50% opacity. Subscribing here (rather than in App)
+  // keeps the row-list localised and avoids an extra prop drill.
+  const clipMode = useClipboard((s) => s.mode);
+  const clipPaths = useClipboard((s) => s.paths);
+
   const selectedRowRef = useRef<HTMLDivElement | null>(null);
 
   const [resizing, setResizing] = useState<ResizeState | null>(null);
   const [dragCol, setDragCol] = useState<SortableField | null>(null);
   const [dragHint, setDragHint] = useState<DragHint | null>(null);
 
-  // Keep the selected row visible when arrow-key navigating.
+  // Keep the primary (anchor) row visible when arrow-key navigating. With
+  // multi-select we pick the anchor — that's the row the user is actively
+  // steering. Falls back to the smallest selected index if no anchor.
   useEffect(() => {
     selectedRowRef.current?.scrollIntoView({ block: "nearest" });
-  }, [selectedIndex]);
+  }, [lastAnchorIndex]);
 
   // Window-level resize tracking — attaching to the handle itself would stop
   // firing the moment the cursor leaves the handle's 6px hit area.
@@ -156,6 +184,24 @@ export function FileList(): JSX.Element {
     }
     // Phase 2.1: files open via OS default handler.
     void openEntry(entry.path);
+  }
+
+  // Click dispatch table.
+  //   bare click  → single-select (clears everything else).
+  //   Shift+click → range from anchor to i (replaces prior selection).
+  //   Ctrl/⌘+click → toggle i in the set; anchor jumps to i.
+  // Shared by the row-level onClick and the Name-cell button.
+  function applyClickSelection(
+    e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean },
+    i: number
+  ): void {
+    if (e.shiftKey) {
+      selectRange(i);
+    } else if (e.ctrlKey || e.metaKey) {
+      toggleSelect(i);
+    } else {
+      selectOnly(i);
+    }
   }
 
   function startResize(
@@ -229,12 +275,45 @@ export function FileList(): JSX.Element {
     setDragHint(null);
   }
 
+  // Handler for right-click on a row. We keep the existing selection if the
+  // row is already part of it (matches Windows Explorer: right-clicking a
+  // selected file targets all selected files), otherwise we single-select
+  // the clicked row before opening the menu so multi-select actions have a
+  // sensible target set.
+  function onRowContextMenu(
+    e: React.MouseEvent<HTMLDivElement>,
+    entry: Entry,
+    i: number
+  ): void {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!selectedIndices.has(i)) {
+      selectOnly(i);
+    }
+    onContextMenuRow(entry, i, e.clientX, e.clientY);
+  }
+
+  function onBlankContextMenu(e: React.MouseEvent<HTMLDivElement>): void {
+    // Only fire when the user right-clicks on the list background, not on a
+    // row that bubbled up. Row handler already calls stopPropagation.
+    e.preventDefault();
+    onContextMenuBlank(e.clientX, e.clientY);
+  }
+
   if (loading && entries.length === 0) {
-    return <div className="filelist-empty">Loading…</div>;
+    return (
+      <div className="filelist" onContextMenu={onBlankContextMenu}>
+        <div className="filelist-empty">Loading…</div>
+      </div>
+    );
   }
 
   if (currentPath !== null && entries.length === 0) {
-    return <div className="filelist-empty">Empty directory</div>;
+    return (
+      <div className="filelist" onContextMenu={onBlankContextMenu}>
+        <div className="filelist-empty">Empty directory</div>
+      </div>
+    );
   }
 
   // Build the grid template from the columnOrder + columnWidths. The LAST
@@ -258,7 +337,13 @@ export function FileList(): JSX.Element {
             className="filelist-name"
             onClick={(e) => {
               e.stopPropagation();
-              setSelectedIndex(i);
+              // Modifier keys mean "select only, don't open" — matches
+              // native file-manager UX where Ctrl+Click never activates.
+              if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                applyClickSelection(e, i);
+                return;
+              }
+              selectOnly(i);
               onRowActivate(entry);
             }}
             title={entry.path}
@@ -289,7 +374,7 @@ export function FileList(): JSX.Element {
   }
 
   return (
-    <div className="filelist">
+    <div className="filelist" onContextMenu={onBlankContextMenu}>
       <div
         className="filelist-head"
         style={{ gridTemplateColumns: gridTemplate }}
@@ -345,23 +430,32 @@ export function FileList(): JSX.Element {
       </div>
       <div className="filelist-body">
         {entries.map((entry, i) => {
-          const selected = i === selectedIndex;
+          const selected = selectedIndices.has(i);
+          // Attach scrollIntoView ref to the anchor row (primary focus). If
+          // no anchor yet, attach to the first selected row so reveal still
+          // works after selectAll / initial click.
+          const isScrollTarget =
+            lastAnchorIndex >= 0 ? i === lastAnchorIndex : selected;
           const hidden = entry.hidden === true;
+          const cutPending =
+            clipMode === "cut" && clipPaths.includes(entry.path);
           return (
             <div
               key={entry.path}
-              ref={selected ? selectedRowRef : null}
+              ref={isScrollTarget ? selectedRowRef : null}
               className={[
                 "filelist-row",
                 selected ? "filelist-row-selected" : "",
                 hidden ? "filelist-row-hidden" : "",
-                entry.type === "directory" ? "filelist-row-dir" : ""
+                entry.type === "directory" ? "filelist-row-dir" : "",
+                cutPending ? "cut-pending" : ""
               ]
                 .filter(Boolean)
                 .join(" ")}
               style={{ gridTemplateColumns: gridTemplate }}
-              onClick={() => setSelectedIndex(i)}
+              onClick={(e) => applyClickSelection(e, i)}
               onDoubleClick={() => onRowActivate(entry)}
+              onContextMenu={(e) => onRowContextMenu(e, entry, i)}
             >
               {columnOrder.map((col) => renderCell(col, entry, i))}
             </div>

@@ -65,6 +65,71 @@ const (
 	swShowNormal = 1
 )
 
+// shFileOpErrorMessage maps SHFileOperationW's pre-Win7 DE_* return codes to
+// human-readable strings. Post-Win7 returns are generic Win32 error codes, so
+// anything outside this table falls through to a numeric-only message.
+//
+// Reference:
+// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationw
+//
+// Nonzero returns are NOT GetLastError — they come from a dedicated 16-bit
+// table that predates modern Win32 error plumbing. Callers that need
+// programmatic dispatch (e.g. distinguishing EACCES from EIO in ops) should
+// do it at the ops layer; this helper only improves log legibility.
+func shFileOpErrorMessage(ret uint32) string {
+	switch ret {
+	case 0x71:
+		return "source and destination files are the same" // DE_SAMEFILE
+	case 0x72:
+		return "multiple file paths, single destination" // DE_MANYSRC1DEST
+	case 0x73:
+		return "different drives for rename" // DE_DIFFDIR
+	case 0x74:
+		return "root directory error" // DE_ROOTDIR
+	case 0x75:
+		return "operation canceled by user" // DE_OPCANCELLED
+	case 0x76:
+		return "destination is a subtree of source" // DE_DESTSUBTREE
+	case 0x78:
+		return "access denied" // DE_ACCESSDENIEDSRC
+	case 0x79:
+		return "path exceeds MAX_PATH" // DE_PATHTOODEEP
+	case 0x7A:
+		return "multiple destination paths, single source" // DE_MANYDEST
+	case 0x7C:
+		return "invalid source path" // DE_INVALIDFILES
+	case 0x7D:
+		return "same path for source and destination" // DE_DESTSAMETREE
+	case 0x7E:
+		return "destination file already exists" // DE_FLDDESTISFILE
+	case 0x80:
+		return "destination is a folder, source is a file" // DE_FILEDESTISFLD
+	case 0x81:
+		return "path buffer overflow" // DE_FILENAMETOOLONG
+	case 0x82:
+		return "destination is read-only CD-ROM" // DE_DEST_IS_CDROM
+	case 0x83:
+		return "destination is write-protected DVD" // DE_DEST_IS_DVD
+	case 0x84:
+		return "destination is write-protected CD-RW" // DE_DEST_IS_CDRECORD
+	case 0x85:
+		return "file exceeds maximum allowed size" // DE_FILE_TOO_LARGE
+	case 0x86:
+		return "source is read-only CD-ROM" // DE_SRC_IS_CDROM
+	case 0x87:
+		return "source is write-protected DVD" // DE_SRC_IS_DVD
+	case 0x88:
+		return "source is write-protected CD-RW" // DE_SRC_IS_CDRECORD
+	case 0xB7:
+		return "error renaming file" // DE_ERROR_MAX
+	case 0x402:
+		return "unknown error" // ERRORONDEST
+	case 0x10000:
+		return "unspecified error" // DE_ROOTDIR_ERRORONDEST
+	}
+	return fmt.Sprintf("unknown SHFileOperationW error: 0x%X", ret)
+}
+
 // shellTrash moves path to the Recycle Bin via SHFileOperationW.
 //
 // Three subtle requirements:
@@ -105,14 +170,13 @@ func shellTrash(_ context.Context, path string) error {
 		// https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shfileoperationw#return-value
 		// 0x7C (ERROR_INVALID_INDEX): invalid source path
 		// 0x78 (DE_ACCESSDENIEDSRC): insufficient permissions
-		// We return a generic error with the code embedded; callers
-		// that care about the precise mapping can parse it. For the
-		// Phase 2.1 surface, mapFSError's EIO fallback is acceptable
-		// for rare codes not covered by errmap_windows.go.
+		// shFileOpErrorMessage expands the DE_* table; ops layer can still
+		// programmatically dispatch via the hex code if it ever needs to
+		// distinguish EACCES from EIO (W1-2 scope: surface only, no sentinel).
 		if ret == 120 /* ERROR_CALL_NOT_IMPLEMENTED */ {
 			return ErrTrashUnavailable
 		}
-		return fmt.Errorf("SHFileOperationW: error 0x%X on %q", ret, path)
+		return fmt.Errorf("SHFileOperationW failed for %q: %s (0x%X)", path, shFileOpErrorMessage(uint32(ret)), ret)
 	}
 	// Intentionally skip the op.AnyOperationsAborted check — see comment above.
 	return nil

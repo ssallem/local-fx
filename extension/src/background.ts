@@ -2,7 +2,8 @@ import {
   HOST_NAME,
   type ErrorCode,
   type Request,
-  type Response
+  type Response,
+  type StreamEvent
 } from "./types/shared";
 
 type Pending = {
@@ -11,6 +12,12 @@ type Pending = {
 };
 
 const REQUEST_TIMEOUT_MS = 10_000;
+// WARNING-P2-R4-1 — streaming ops (copy/move/search) can take minutes for
+// large payloads. A 10s cap would surface a bogus E_TIMEOUT while the Host
+// is still streaming progress events and the job completes normally via
+// the Event channel. 24h is effectively unlimited for user-initiated
+// paste/move; the cancel op provides the real escape hatch.
+const STREAM_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
 // F-6: MV3 Service Worker goes idle after 30s. A chrome.alarms-based
 // keepalive wakes the SW so pending requests don't silently disappear.
@@ -100,6 +107,16 @@ function ensurePort(): chrome.runtime.Port | null {
   try {
     const next = chrome.runtime.connectNative(HOST_NAME);
     next.onMessage.addListener((raw: unknown) => {
+      // Phase 2.3: streaming ops (copy / future move / search) interleave
+      // mid-stream Event frames with their terminal Response. Event frames
+      // are identified by the presence of a string `event` field and
+      // broadcast to every extension page so any open tab's ipc.ts listener
+      // can correlate by request id. The final Response still flows through
+      // the pending Map below — unchanged from Phase 2.1 semantics.
+      if (isEventFrame(raw)) {
+        broadcastEvent(raw);
+        return;
+      }
       if (!isResponse(raw)) {
         console.warn("[local-explorer] malformed host message", raw);
         return;
@@ -144,6 +161,48 @@ function isResponse(value: unknown): value is Response {
   return typeof v.id === "string" && typeof v.ok === "boolean";
 }
 
+// Phase 2.3 — EventFrame carries { id, event, payload } and never an `ok`
+// field (PROTOCOL.md §6). The Go side emits these via WriteFrame on the
+// same stdout pipe as the final Response, serialised by SafeWriter. We key
+// detection on the string `event` discriminator so a malformed frame lacking
+// both `ok` and `event` falls through to the "malformed host message" warn.
+function isEventFrame(value: unknown): value is StreamEvent {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.id === "string" &&
+    typeof v.event === "string" &&
+    (v.event === "progress" || v.event === "item" || v.event === "done")
+  );
+}
+
+// Phase 2.3 — broadcast Host Event frames to every extension page so a
+// UI-side `chrome.runtime.onMessage` listener (registered in ipc.ts) can
+// route by request id. `chrome.runtime.sendMessage` with no tab target
+// delivers to all open extension pages + popups + the SW itself; we wrap
+// the Event in `{ kind: "host-event" }` so ipc.ts can distinguish it from
+// a UI-originated Request that would collide on this same channel. The
+// sendMessage promise rejects with "Could not establish connection" when
+// no listeners are registered yet — swallow it; it is the normal state
+// during early startup before the newtab page mounts.
+function broadcastEvent(evt: StreamEvent): void {
+  try {
+    const maybePromise = chrome.runtime.sendMessage({
+      kind: "host-event",
+      event: evt
+    });
+    // @types/chrome models sendMessage as returning a Promise in MV3. Guard
+    // defensively in case a runtime returns void (older typings / tests).
+    if (maybePromise && typeof (maybePromise as Promise<unknown>).catch === "function") {
+      (maybePromise as Promise<unknown>).catch(() => {
+        /* no listeners — expected during early startup */
+      });
+    }
+  } catch {
+    /* sendMessage threw synchronously — no receivers, ignore */
+  }
+}
+
 function isRequest(value: unknown): value is Request {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -151,6 +210,19 @@ function isRequest(value: unknown): value is Request {
 }
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  // Phase 2.3: host-event broadcasts originate from THIS service worker
+  // (broadcastEvent above). chrome.runtime.sendMessage delivers to every
+  // extension context including the sender, so the SW receives its own
+  // broadcast here — drop silently and do NOT call sendResponse, letting
+  // the real UI-side listener in ipc.ts handle routing.
+  if (
+    typeof message === "object" &&
+    message !== null &&
+    (message as { kind?: unknown }).kind === "host-event"
+  ) {
+    return false;
+  }
+
   if (!isRequest(message)) {
     sendResponse({
       id: "unknown",
@@ -182,6 +254,7 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return false;
   }
 
+  const timeoutMs = req.stream ? STREAM_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
   const timeout = setTimeout(() => {
     const entry = pending.get(req.id);
     if (!entry) return;
@@ -192,11 +265,11 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       ok: false,
       error: {
         code: "E_TIMEOUT",
-        message: `request timed out after ${REQUEST_TIMEOUT_MS}ms`,
+        message: `request timed out after ${timeoutMs}ms`,
         retryable: true
       }
     });
-  }, REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
 
   pending.set(req.id, {
     resolve: (value) => sendResponse(value),

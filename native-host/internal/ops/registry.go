@@ -18,9 +18,24 @@ import (
 // The ctx is passed through from main for future cancellation support.
 type Handler func(ctx context.Context, req protocol.Request) protocol.Response
 
+// StreamHandler is the signature for ops that emit mid-stream events
+// (progress, item, done) before their final Response. It runs in its own
+// goroutine and may call `emit` any number of times over its lifetime. The
+// returned Response is the final frame on the wire; a successful streaming
+// op returns Response{OK:true, Data: map[string]any{}} after emitting a
+// "done" event, while a setup error (bad args, ENOENT on src) returns an
+// Error Response WITHOUT emitting a "done" event. See PROTOCOL.md §6.
+//
+// The `emit` func returns the underlying WriteFrame error so the handler
+// can abort early if the peer has disconnected; handlers typically ignore
+// the return value because the next iteration's ctx.Err() check will
+// short-circuit anyway.
+type StreamHandler func(ctx context.Context, req protocol.Request, emit func(protocol.EventFrame) error) protocol.Response
+
 var (
-	mu        sync.RWMutex
-	handlers  = map[string]Handler{}
+	mu             sync.RWMutex
+	handlers       = map[string]Handler{}
+	streamHandlers = map[string]StreamHandler{}
 )
 
 // Register associates op with h. Re-registering the same op overwrites the
@@ -38,14 +53,40 @@ func Lookup(op string) Handler {
 	return handlers[op]
 }
 
+// RegisterStream associates op with a streaming handler h. An op may have
+// BOTH a regular handler and a stream handler registered; the dispatcher
+// picks based on Request.Stream. Re-registering overwrites.
+func RegisterStream(op string, h StreamHandler) {
+	mu.Lock()
+	defer mu.Unlock()
+	streamHandlers[op] = h
+}
+
+// LookupStream returns the stream handler for op, or nil if none is
+// registered. The dispatcher falls back to E_UNKNOWN_OP when a request has
+// Stream=true but no stream handler exists.
+func LookupStream(op string) StreamHandler {
+	mu.RLock()
+	defer mu.RUnlock()
+	return streamHandlers[op]
+}
+
 // Registered returns all registered op names in lexicographic order.
 // Go map iteration is randomised, so we sort explicitly to give callers a
-// deterministic view (used by diagnostics and tests).
+// deterministic view (used by diagnostics and tests). Stream-only ops are
+// included under their op name.
 func Registered() []string {
 	mu.RLock()
 	defer mu.RUnlock()
-	names := make([]string, 0, len(handlers))
+	seen := make(map[string]struct{}, len(handlers)+len(streamHandlers))
 	for k := range handlers {
+		seen[k] = struct{}{}
+	}
+	for k := range streamHandlers {
+		seen[k] = struct{}{}
+	}
+	names := make([]string, 0, len(seen))
+	for k := range seen {
 		names = append(names, k)
 	}
 	sort.Strings(names)
@@ -64,4 +105,9 @@ func init() {
 	Register("remove", Remove)
 	Register("open", Open)
 	Register("revealInOsExplorer", RevealInOsExplorer)
+	// Phase 2.3 — streaming ops + out-of-band cancel. See PROTOCOL.md §6.
+	RegisterStream("copy", Copy)
+	Register("cancel", Cancel)
+	// Phase 2.4 — move (same-volume rename with cross-volume copy-then-delete fallback).
+	RegisterStream("move", Move)
 }

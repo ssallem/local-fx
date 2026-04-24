@@ -1,9 +1,12 @@
 import type {
+  CancelArgs,
+  CopyArgs,
   Drive,
   EmptyData,
   EntryMeta,
   ErrorResponse,
   MkdirArgs,
+  MoveArgs,
   OpArgsMap,
   OpDataMap,
   OpNoArgs,
@@ -12,7 +15,8 @@ import type {
   RemoveArgs,
   RenameArgs,
   Request,
-  Response
+  Response,
+  StreamEvent
 } from "../types/shared";
 
 // PROTOCOL.md §4: Phase 1+ handshake requires the extension to advertise the
@@ -204,4 +208,141 @@ export async function openEntry(path: string): Promise<void> {
 export async function revealEntry(path: string): Promise<void> {
   const resp = await request("revealInOsExplorer", { path });
   unwrapVoid(resp);
+}
+
+// -----------------------------------------------------------------------------
+// Phase 2.3 — streaming op helpers (copy / cancel) + EventFrame routing.
+//
+// background.ts broadcasts every Host EventFrame as
+// `chrome.runtime.sendMessage({ kind: "host-event", event })`. Each open
+// extension page receives that message; we register a single onMessage
+// listener here and dispatch by request id to per-id callbacks registered
+// via requestStream(). The terminal "done" event clears the listener;
+// callers may also clear it explicitly when their stream resolves with an
+// error before any "done" frame arrives.
+// -----------------------------------------------------------------------------
+
+type StreamListener = (event: StreamEvent) => void;
+const streamListeners = new Map<string, StreamListener>();
+
+// One-time install: chrome.runtime.onMessage stays registered for the page's
+// lifetime, which matches the SW's lifetime for our purposes (the SW restarts
+// the listener side). The listener is idempotent — registering twice would
+// just no-op the second time, but we guard with a module-level flag so hot
+// reloads in dev don't pile up handlers.
+let streamListenerInstalled = false;
+function ensureStreamListenerInstalled(): void {
+  if (streamListenerInstalled) return;
+  streamListenerInstalled = true;
+  chrome.runtime.onMessage.addListener((msg: unknown) => {
+    if (
+      typeof msg !== "object" ||
+      msg === null ||
+      (msg as { kind?: unknown }).kind !== "host-event"
+    ) {
+      return false;
+    }
+    const evt = (msg as { event?: unknown }).event as StreamEvent | undefined;
+    if (!evt || typeof evt.id !== "string") return false;
+    const listener = streamListeners.get(evt.id);
+    if (!listener) return false;
+    try {
+      listener(evt);
+    } catch (e) {
+      // Defensive: a throwing listener should not poison the dispatch loop.
+      // eslint-disable-next-line no-console
+      console.error("[ipc] stream listener threw", e);
+    }
+    if (evt.event === "done") {
+      streamListeners.delete(evt.id);
+    }
+    return false;
+  });
+}
+
+// StreamHandle bundles the request id (so the caller can correlate with later
+// telemetry / cancel calls), the resolution promise (the terminal Response),
+// and an idempotent cancel() that fires the §7.13 cancel op.
+export interface StreamHandle<T = unknown> {
+  id: string;
+  promise: Promise<Response<T>>;
+  cancel: () => Promise<void>;
+}
+
+/**
+ * Issue a streaming op, routing every EventFrame for its id to onEvent until
+ * the terminal Response arrives. Caller owns the lifetime of onEvent — once
+ * the returned promise settles (or the "done" event fires), the listener is
+ * removed automatically.
+ *
+ * Streaming requests intentionally bypass the F-6 retry path: a half-emitted
+ * stream cannot be safely re-driven from scratch without coordinating with
+ * the Host on which frames have already been delivered. The single-shot
+ * sendOnce path is adequate; transient failures surface as a normal error
+ * Response and the caller decides whether to restart.
+ */
+export function requestStream<O extends keyof OpArgsMap>(
+  op: O,
+  args: OpArgsMap[O],
+  onEvent: StreamListener
+): StreamHandle<OpDataMap[O]> {
+  ensureStreamListenerInstalled();
+  const req = buildRequest(op, args);
+  // Mark stream:true so the SW/Host treat it as a streaming op (PROTOCOL §6).
+  const streamReq: Request = { ...req, stream: true };
+  streamListeners.set(req.id, onEvent);
+
+  const promise = sendOnce<O>(streamReq).finally(() => {
+    // Defensive cleanup: if the Host returned ok:false BEFORE emitting "done"
+    // (e.g. EACCES at open-time), there is no terminal event to drop the
+    // listener. Always clear here.
+    streamListeners.delete(req.id);
+  });
+
+  const cancelHandle = async (): Promise<void> => {
+    await cancel(req.id);
+  };
+
+  return { id: req.id, promise, cancel: cancelHandle };
+}
+
+/**
+ * Convenience wrapper for the most common streaming op. Mirrors readdir/stat
+ * style: pass typed args + a callback, get back a StreamHandle.
+ */
+export function copyFile(
+  args: CopyArgs,
+  onEvent: StreamListener
+): StreamHandle<EmptyData> {
+  return requestStream("copy", args, onEvent);
+}
+
+/**
+ * Phase 2.4 — streaming move. Same shape as copyFile; the Host treats
+ * intra-volume moves as a fast OS rename and falls back to copy+remove
+ * across volumes. Conflict resolution MUST be settled UI-side: the Host
+ * rejects MoveArgs.conflict === "prompt" with E_BAD_REQUEST.
+ */
+export function moveFile(
+  args: MoveArgs,
+  onEvent: StreamListener
+): StreamHandle<EmptyData> {
+  return requestStream("move", args, onEvent);
+}
+
+/**
+ * Cancel an in-flight streaming op by its request id (PROTOCOL §7.13).
+ * Resolves to `accepted`: true when the Host acknowledged a known target,
+ * false when the id was unknown (already finished, never seen, etc.).
+ *
+ * Errors at the transport layer (E_TIMEOUT / E_HOST_CRASH on the cancel
+ * call itself) collapse to `false` so callers can treat the boolean as
+ * "did the cancel actually take effect". The original op's terminal "done"
+ * event remains the source of truth for `canceled: true`.
+ */
+export async function cancel(targetId: string): Promise<boolean> {
+  const args: CancelArgs = { targetId };
+  const resp = await request("cancel", args);
+  if (!resp.ok) return false;
+  return resp.data.accepted === true;
 }

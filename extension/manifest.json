@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Local Explorer",
-  "version": "0.0.1",
-  "description": "Browse local drives and files from a Chrome tab.",
+  "version": "0.2.0",
+  "description": "브라우저 새 탭에서 로컬 드라이브와 파일을 탐색·조작할 수 있는 확장. Native Messaging Host를 통해 Windows/macOS 파일 시스템과 통신. (Requires Native Host installation)",
+  "author": "LocalFx",
+  "homepage_url": "https://github.com/example/local-fx",
+  "minimum_chrome_version": "116",
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -14,8 +17,18 @@
   "chrome_url_overrides": {
     "newtab": "tab.html"
   },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "action": {
-    "default_title": "Local Explorer"
+    "default_title": "Local Explorer",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1PvYOaqEds6GAXekKpC39DsYwzA/khxKLQLo+0isXvKXdLZrdJFjb/g/ERLs7wTZf+dFgZULKT6OuhynIva4FSsP90v8b7a6WA5fMA7G1Es58usN9QodCZkvGLyF6DcpIJBaH2laSUxew/VTEdoM7oBKZVS0tXybpmMIcm+elS+cdUgLonXM67hmVI0o3Ui5gw4lX9LGg/+tTMVZuK41VtpEn3nywtuF8HZcIiceUGkRZJiEU67pAFjUvsWGzX9/Iorm/bzAp+UAeiTuxIad/IY+rlWB4JYlGR9og+gFfAOisPtHw9yI5OWFC01PYzxiKXnQpoyslH/JtaiEug1YlQIDAQAB"
 }
