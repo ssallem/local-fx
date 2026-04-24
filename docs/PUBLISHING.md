@@ -26,11 +26,18 @@ npm run package    # vite build + key 제거 + zip
 
 1. Developer Dashboard → "새 항목" → zip 업로드
 2. 스토어 리스팅:
-   - **제품 이름**: Local Explorer
+   - **제품 이름**: Tab Explorer: File Manager in a New Tab
+   - **짧은 이름(short_name)**: Tab Explorer
    - **요약(132자)**: "브라우저 새 탭에서 로컬 드라이브를 탐색하고 파일을 만들기·이름변경·복사·이동·삭제할 수 있는 확장."
-   - **상세 설명**: 기능 목록 + Native Host 설치 안내 링크
+   - **상세 설명**: 기능 목록 + Native Host 설치 안내 링크. 반드시 아래 차별화 문구 포함:
+
+     > ⚠️ 이 확장은 링크 핸들러가 아닙니다. 브라우저 새 탭에서 돌아가는 완전한 파일 탐색기입니다.
+     > (유사명 "Local Explorer - Open File"는 링크 클릭 시 파일을 여는 별개 제품입니다.)
+
    - **카테고리**: Productivity
    - **언어**: 한국어 + 영어 (선택)
+
+   > 참고: 내부 코드명 `LocalFx` / Native Host ID `com.local.fx` / zip 파일명 `localfx-v0.2.0.zip`은 리브랜딩과 무관하게 유지됩니다.
 3. 개인정보 처리방침 URL 입력 (GitHub Pages 배포된 PRIVACY.md)
 4. Native Host 설치 링크: README의 설치 섹션
 5. 심사 제출

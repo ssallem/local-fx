@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Local Explorer",
+  "name": "Tab Explorer: File Manager in a New Tab",
+  "short_name": "Tab Explorer",
   "version": "0.2.0",
-  "description": "브라우저 새 탭에서 로컬 드라이브와 파일을 탐색·조작할 수 있는 확장. Native Messaging Host를 통해 Windows/macOS 파일 시스템과 통신. (Requires Native Host installation)",
+  "description": "Open a new tab and get a complete file manager — browse drives, copy/move/rename/trash files, resolve conflicts, track progress. Not a link handler — a full explorer UI inside your browser tab. Requires a free Native Host install (Windows / macOS).",
   "author": "LocalFx",
   "homepage_url": "https://github.com/ssallem/local-fx",
   "minimum_chrome_version": "116",

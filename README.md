@@ -1,6 +1,8 @@
-# Local Explorer
+# Tab Explorer
 
-> Chrome 새 탭에서 로컬 드라이브를 탐색·조작하는 확장. Windows 11 + macOS 지원. v0.2.0 (Phase 2)
+> Chrome 새 탭에서 로컬 드라이브를 탐색·조작하는 확장 — File Manager in a New Tab. Windows 11 + macOS 지원. v0.2.0 (Phase 2)
+>
+> (내부 코드명: **LocalFx**. 바이너리·레지스트리·zip 파일명에서만 사용)
 
 브라우저를 나가지 않고 C:\, D:\, /Volumes/... 같은 로컬 드라이브에 접근해 파일을 만들고, 이름을 바꾸고, 휴지통에 버리고, 복사하고, 이동할 수 있습니다.
 
@@ -35,7 +37,7 @@ npm run build
 
 Chrome: `chrome://extensions` → 개발자 모드 ON → "압축해제된 확장 프로그램 로드" → `extension/dist` 선택.
 
-새 탭을 열면 Local Explorer가 표시됩니다.
+새 탭을 열면 Tab Explorer가 표시됩니다.
 
 ## 기능
 

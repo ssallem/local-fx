@@ -1,1 +1,1 @@
-a3fa64101eec904ec96b93d68cb6187e3cd52dd2ea3d64f16be5c0e111f395ee  localfx-v0.2.0.zip
+960644a4c0522bd5edbd5f30cf5e72f71cc6427d2accaf12233e455c33664bcb  localfx-v0.2.0.zip

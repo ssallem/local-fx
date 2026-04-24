@@ -4,7 +4,7 @@
 
 ## 요약
 
-**Local Explorer는 사용자의 로컬 파일을 수집·전송하지 않습니다.**
+**Tab Explorer는 사용자의 로컬 파일을 수집·전송하지 않습니다.**
 - 외부 서버로 데이터 전송 없음
 - 통신은 **동일 기기 내** Native Messaging Host 프로세스와의 stdio만 사용
 - 원격 URL 요청 없음, 광고·분석 SDK 없음
