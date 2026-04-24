@@ -1,0 +1,12 @@
+{
+  "name": "store-assets",
+  "version": "1.0.0",
+  "description": "이 폴더는 스토어 리스팅 업로드용 이미지를 둡니다. Git에 커밋해 팀원이 공유.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
