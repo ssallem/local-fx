@@ -7,8 +7,14 @@
 #   .\install.ps1                                      # auto: build key + pick default paths
 #   .\install.ps1 -HostBinary C:\path\fx-host.exe
 #   .\install.ps1 -ExtensionId abcdefghijklmnopabcdefghijklmnop
+#   .\install.ps1 -ExtensionId "devid32chars...,prodid32chars..."  # CSV: register multiple IDs
 #   .\install.ps1 -Force                               # overwrite existing registration
 #   .\install.ps1 -SkipEdge                            # Chrome only
+#
+# -ExtensionId accepts a comma-separated list of 32-char Chrome extension IDs.
+# Each ID is validated against ^[a-p]{32}$ and emitted as a separate entry in
+# the manifest's allowed_origins array. A single ID (no comma) keeps the legacy
+# single-entry behavior unchanged.
 
 [CmdletBinding()]
 param(
@@ -60,7 +66,9 @@ if (-not $HostBinary -or -not (Test-Path -LiteralPath $HostBinary)) {
 }
 $HostBinary = (Resolve-Path -LiteralPath $HostBinary).Path
 
-# 2. Resolve extension ID (generate key if missing)
+# 2. Resolve extension ID(s) (generate key if missing)
+# -ExtensionId accepts a single 32-char ID or a comma-separated list ("id1,id2").
+# When omitted, generate-dev-key.ps1 emits a single dev ID (legacy behavior).
 if (-not $ExtensionId) {
     if (-not (Test-Path -LiteralPath $keyGenScript)) {
         Fail "key generator missing: $keyGenScript" 1
@@ -71,8 +79,19 @@ if (-not $ExtensionId) {
     $ExtensionId = ($genOut | Where-Object { $_ -match '^[a-p]{32}$' } | Select-Object -Last 1)
     if (-not $ExtensionId) { Fail "could not parse extension ID from key generator output" 1 }
 }
-if ($ExtensionId -notmatch '^[a-p]{32}$') {
-    Fail "invalid extension ID format (expected 32 chars a-p): $ExtensionId" 1
+
+# Split CSV, trim, validate each. Single ID (no comma) yields a 1-element array.
+$ExtensionIds = @()
+foreach ($raw in ($ExtensionId -split ',')) {
+    $trimmed = $raw.Trim()
+    if (-not $trimmed) { continue }
+    if ($trimmed -notmatch '^[a-p]{32}$') {
+        Fail "invalid extension ID format (expected 32 chars a-p): $trimmed" 1
+    }
+    $ExtensionIds += $trimmed
+}
+if ($ExtensionIds.Count -eq 0) {
+    Fail "no valid extension IDs found in -ExtensionId value" 1
 }
 
 # 3. Ensure install dir
@@ -96,9 +115,17 @@ $tmpl = [System.IO.File]::ReadAllText($templatePath)
 # PowerShell -replace의 replacement string에서 '\\' 는 리터럴 백슬래시 1개(no-op),
 # '\\\\' 가 리터럴 백슬래시 2개. 이걸로 C:\Users\... 가 JSON에 C:\\Users\\... 로 들어간다.
 $hostPathJson = $HostBinary -replace '\\', '\\\\'
+
+# Build the {{ALLOWED_ORIGINS}} block: one JSON-quoted "chrome-extension://<id>/" per
+# ID, separated by ',' + newline + 4 spaces (matches the indent already present in
+# the template at the placeholder location, so the rendered manifest is uniformly
+# 4-space-indented inside the allowed_origins array).
+$originLines = $ExtensionIds | ForEach-Object { '"chrome-extension://' + $_ + '/"' }
+$allowedOrigins = $originLines -join ",`r`n    "
+
 $rendered = $tmpl `
     -replace '\{\{HOST_BINARY_PATH\}\}', $hostPathJson `
-    -replace '\{\{EXTENSION_ID\}\}', $ExtensionId
+    -replace '\{\{ALLOWED_ORIGINS\}\}', $allowedOrigins
 try {
     # BOM-less UTF-8: Chrome Native Messaging 매니페스트 파서는 BOM 이 있으면
     # 거부할 수 있다. 3인자 오버로드로 명시적 인코딩 지정. ($utf8NoBom 은 상단 선언)
@@ -125,17 +152,30 @@ foreach ($key in $regTargets) {
 }
 
 # 6. Integrity record (SHA-256 of host binary + timestamp)
+# extension_id schema (backward-compat contract for Phase 4 self-verification):
+#   - single ID install  -> JSON string scalar  ("abcd...")  — matches pre-patch shape
+#   - multi-ID  install  -> JSON array of strings (["abcd...", "efgh..."])
+# Future readers must accept both via typeof / type-switch. We build $extIdsJson
+# as the literal JSON fragment, inject it via a placeholder, and post-substitute
+# to bypass PS 5.1 ConvertTo-Json's single-element-array unwrap quirk.
 try {
     $sha = (Get-FileHash -LiteralPath $HostBinary -Algorithm SHA256).Hash.ToLower()
+    if ($ExtensionIds.Count -eq 1) {
+        $extIdsJson = '"' + $ExtensionIds[0] + '"'
+    } else {
+        $extIdsJson = '[' + (($ExtensionIds | ForEach-Object { '"' + $_ + '"' }) -join ', ') + ']'
+    }
+    $extIdsPlaceholder = '__LOCAL_FX_EXT_IDS_PLACEHOLDER__'
     $record = [ordered]@{
         host_name    = $HostName
         host_path    = $HostBinary
         host_sha256  = $sha
-        extension_id = $ExtensionId
+        extension_id = $extIdsPlaceholder
         manifest     = $manifestOutPath
         installed_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     }
     $recordJson = $record | ConvertTo-Json -Depth 5
+    $recordJson = $recordJson -replace [regex]::Escape('"' + $extIdsPlaceholder + '"'), $extIdsJson
     # BOM-less UTF-8: Go/Node JSON 파서는 BOM 이 있으면 실패 가능. $utf8NoBom 은 상단에서 공용 선언.
     [System.IO.File]::WriteAllText($integrityPath, $recordJson, $utf8NoBom)
     Write-Host "[ok] integrity record: $integrityPath" -ForegroundColor Green
@@ -147,7 +187,14 @@ Write-Host ""
 Write-Host "---- install complete ----" -ForegroundColor Green
 Write-Host "host binary  : $HostBinary"
 Write-Host "manifest     : $manifestOutPath"
-Write-Host "extension id : $ExtensionId"
+if ($ExtensionIds.Count -eq 1) {
+    Write-Host "extension id : $($ExtensionIds[0])"
+} else {
+    Write-Host "extension ids: $($ExtensionIds -join ', ')"
+    foreach ($id in $ExtensionIds) {
+        Write-Host "  - $id"
+    }
+}
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Build the extension:  cd $projectRoot\extension ; npm install ; npm run build"

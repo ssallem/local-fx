@@ -360,3 +360,63 @@ Frame: [uint32 LE length][UTF-8 JSON body]  (Chrome Native Messaging 표준)
 - Phase 2 변경 작업 (다음 세션)
 - Phase 3 고급 기능 (선택)
 - Phase 4 배포 (MSI/pkg 서명·공증)
+
+## 미션 7 (2026-04-28): 배포 후 E_HOST_NOT_FOUND 운영 이슈
+- **원본 요청:** "탭탐색기 확장 프로그램 배포를 했는데 오류가 나고 있어..[Image #1]"
+- **증상:** Chrome Web Store v0.2.1 정상 로드, UI 정상, 하단 "드라이브 0개", DevPanel 호스트 ping → `E_HOST_NOT_FOUND: Specified native messaging host not found.`
+
+### 진단 (Researcher 1차)
+1. **`extension/scripts/package.mjs:24-33`이 production zip 빌드 시 manifest의 `key` 필드를 strip한다.** → Web Store는 자체적으로 새 RSA 키페어를 발급하고 그로부터 production extension ID를 산출.
+2. **dev ID `cjaibkecpdcabflelcjciceofknnpmck` (decisions.md L113)는 dev `key` 기반.** Web Store production ID는 이와 다름(아직 미확인).
+3. **`installer/windows/com.local.fx.json.tmpl`의 allowed_origins는 `chrome-extension://{{EXTENSION_ID}}/` 단일 항목.** install.ps1이 받은 `-ExtensionId`로만 치환됨.
+4. **사용자 PC의 `%LOCALAPPDATA%\LocalFx\com.local.fx.json`은 dev ID로 등록되어 있을 가능성 높음** (이전 미션 3에서 install.ps1 실행 기록). 또는 아예 미설치.
+
+### 근본 원인 후보 (확정 위해 사용자 입력 필요)
+- **(a)** Web Store 버전 production ID ≠ dev ID → allowed_origins mismatch
+- **(b)** native host 자체가 이 PC에 미설치 → 레지스트리 `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.local.fx` 키 자체 부재
+- **(c)** install.ps1 실행 후 fx-host.exe 경로가 변경되어 manifest의 `path` invalid
+
+### 3-track 해결안 (사용자 선택 필요)
+- **Track 1 — 즉시 해결:** Web Store production ID 받아서 사용자 PC에 install.ps1 재실행 (단발성).
+- **Track 2 — installer 다중 ID 지원:** `*.tmpl`의 allowed_origins를 배열로 변경, install.ps1이 `-ExtensionId` CSV 또는 반복 파라미터 수용. dev+prod 동시 지원. 향후 모든 사용자에게 효과.
+- **Track 3 — 재배포로 ID 통일:** package.mjs에서 key strip을 옵션화 → key 유지한 zip을 Web Store에 재업로드 → Web Store가 동일 키 사용 → production ID = dev ID. 이후 모든 설치가 단일 ID로 통일. **단, Web Store는 첫 업로드 시 키를 결정하므로 이미 v0.2.x로 publish 끝났다면 변경 불가**.
+
+### 권장 (리더 판단)
+- 단기: **Track 1** + **Track 2** 병행. 사용자에게 production ID 확인 요청.
+- 장기: docs/NATIVE_HOST_DISTRIBUTION.md에 "사용자가 chrome://extensions에서 ID 확인 → installer에 인자로 전달" 워크플로 명시. installer GitHub Release 자산 게시.
+
+### 차단 항목
+- **사용자 입력 필요:** chrome://extensions에서 "탭 탐색기" production extension ID
+- 의사결정 필요: Track 2 / Track 3 채택 여부
+
+### 진행 결과 (2026-04-28)
+- **사용자 응답:** prod ID `hkopameeeinhkodnddimfmeogkjnpidf` ≠ dev ID `cjaibkecpdcabflelcjciceofknnpmck` → 원인 (a) 확정.
+- **자율 결정:** Track 2 (다중 ID 지원) 채택. Track 1(즉시 재설치 명령)은 사용자에게 안내.
+- **[Implementer 1차 완료]** 4 파일 패치:
+  - `installer/windows/com.local.fx.json.tmpl` + `installer/macos/com.local.fx.json.tmpl`: `{{EXTENSION_ID}}` → `{{ALLOWED_ORIGINS}}` 플레이스홀더로 변경
+  - `installer/windows/install.ps1`: `-ExtensionId` CSV 수용, 각 ID `^[a-p]{32}$` 검증, 4-space 들여쓰기 + `,\r\n` 구분자로 join. PS 5.1 ConvertTo-Json 단일배열 unwrap 우회를 위해 placeholder + post-substitute. 
+  - `installer/macos/install.sh`: `--extension-id` CSV 수용, bash 배열 + IFS 파싱, BSD-sed 회피용 bash parameter substitution (`${var//pat/repl}`).
+- **[Reviewer 1차]** CRITICAL 0 + HIGH 3 + MEDIUM 3 + LOW 2:
+  - HIGH-1: `installer/README.md:36` `{{EXTENSION_ID}}` 문서 잔존 (placeholder 삭제됨)
+  - HIGH-2: `installer/README.md:108` `allowed_origins[0]` 단일 인덱스 안내 (다중 ID 시 오해)
+  - HIGH-3: `integrity.json` `extension_id` 항상 array → pre-patch 단일 ID install과 schema 어긋남
+- **[Implementer 2차 완료]** HIGH 3건 수정:
+  - README placeholder 문서 갱신 + troubleshooting 다중 ID 가이드 + Win/macOS 매니페스트 inspect 명령 + CSV 재설치 예제
+  - integrity.json `extension_id`: 단일 ID → JSON string 스칼라(pre-patch와 동일), 다중 → JSON array. Phase 4 self-verifier는 `typeof`/type-switch로 양쪽 수용. 양 스크립트에 contract comment 인라인.
+- **[Reviewer 2차 PASS]** HIGH 3건 모두 해결. LOW 1건(`README:104` 더블쿼트 안 `~` 미전개) → 직접 수정 완료(`$HOME` 치환).
+
+### 사용자 PC 즉시 복구 명령 (Track 1)
+```powershell
+cd D:\Dev\Chrome\local-fx\installer\windows
+.\install.ps1 -Force -ExtensionId "cjaibkecpdcabflelcjciceofknnpmck,hkopameeeinhkodnddimfmeogkjnpidf"
+```
+- `-Force`: 기존 `%LOCALAPPDATA%\LocalFx\com.local.fx.json` 덮어쓰기
+- 두 ID 모두 등록 → dev unpacked + Web Store 양쪽 작동
+- fx-host.exe 가 `native-host/bin/`에 없으면 `cd ../../native-host && go build -o bin/fx-host.exe ./cmd/fx-host` 선행
+
+### 잔여/후속 (이번 세션 외)
+- Reviewer 1차 MEDIUM 3건: (1) Win CRLF/LF 일관성, (2) ID 중복 제거, (3) macOS heredoc JSON-escape
+- Reviewer 1차 LOW 1건: PS1 단일/다중 라벨 정렬 미세 차이
+- `docs/NATIVE_HOST_DISTRIBUTION.md`에 "chrome://extensions ID 확인 → installer CSV 인자로 전달" 워크플로 명시 (별도 PR)
+- GitHub Releases에 v0.2.1 native host 자산(install.ps1 + install.sh + fx-host bin) 패키징 (별도 작업)
+

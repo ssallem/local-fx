@@ -33,7 +33,7 @@ installer/
 Template placeholders (exact strings):
 
 - `{{HOST_BINARY_PATH}}` — absolute path to the host binary
-- `{{EXTENSION_ID}}`    — 32-char a-p Chrome extension ID
+- `{{ALLOWED_ORIGINS}}` — JSON-quoted `"chrome-extension://<id>/"` strings, comma-separated. The installer fills this in from the validated `-ExtensionId` / `--extension-id` argument (single ID or comma-separated list).
 
 ## Setup order
 
@@ -101,13 +101,25 @@ is not provided.
 **"Specified native messaging host not found"**
 - Check the manifest path was registered:
   - Windows: `reg query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.local.fx"`
-  - macOS: `ls -l "~/Library/Application Support/Google/Chrome/NativeMessagingHosts/"`
+  - macOS: `ls -l "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/"`
 - Check the `path` field inside that manifest points at an existing binary.
 
 **"Access to the specified native messaging host is forbidden"**
-- `allowed_origins[0]` in the manifest must match the extension ID Chrome
-  actually gave your extension. Run `generate-dev-key` again and reload the
-  unpacked extension so they agree.
+- The extension ID Chrome is using must appear as one of the entries in the
+  manifest's `allowed_origins` array (not just the first). Find your current
+  extension ID at `chrome://extensions` and confirm it is listed:
+  - Windows: `type "%LOCALAPPDATA%\LocalFx\com.local.fx.json"`
+  - macOS: `cat "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.local.fx.json"`
+- If your ID is missing, re-run the installer with `-ExtensionId` /
+  `--extension-id` listing every ID you need to allow (comma-separated for
+  multiple). Example:
+  ```
+  .\install.ps1 -Force -ExtensionId "<dev_id>,<prod_id>"
+  ./install.sh --force --extension-id "<dev_id>,<prod_id>"
+  ```
+- A common cause: you loaded the dev unpacked extension AND installed the
+  Web Store version. Each has its own ID. Either register both, or unload
+  the one you are not using.
 - If you manually loaded the extension before injecting `key`, Chrome assigned
   a random ID. Remove and re-load after the key is injected.
 
