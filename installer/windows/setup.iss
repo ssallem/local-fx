@@ -15,7 +15,7 @@
 ; doesn't compose cleanly with #define expansion. Treat the GUID as the stable
 ; identity of this product — never change it, or upgrades will install side-by-side.
 #define MyAppName      "LocalFx Native Host"
-#define MyAppVersion   "0.2.1"
+#define MyAppVersion   "0.3.0"
 #define MyAppPublisher "LocalFx"
 #define MyAppURL       "https://github.com/ssallem/local-fx"
 ; Hardcoded extension IDs (production first, dev second). Order is irrelevant

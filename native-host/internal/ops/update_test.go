@@ -108,7 +108,7 @@ func TestCheckUpdate_CacheHitWithinWindow(t *testing.T) {
 	withFailingClient(t)
 	seedCache(t, updateCache{
 		CheckedAtUnixMs: time.Now().Add(-1 * time.Hour).UnixMilli(),
-		LatestTag:       "v0.3.0",
+		LatestTag:       "v0.4.0",
 		ETag:            `W/"abc"`,
 		LastStatusCode:  200,
 		DownloadURL:     "https://example.invalid/installer.exe",
@@ -122,14 +122,14 @@ func TestCheckUpdate_CacheHitWithinWindow(t *testing.T) {
 	if !d.Cached {
 		t.Errorf("Cached: got false, want true")
 	}
-	if d.LatestVersion != "0.3.0" {
-		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.3.0")
+	if d.LatestVersion != "0.4.0" {
+		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.4.0")
 	}
 }
 
 // TestCheckUpdate_CacheMiss200 — no cache file, server returns 200 with a
 // matching asset. We expect HasUpdate=true (because version.Version is
-// older than the test response 0.3.0) and the asset URL to flow through.
+// older than the test response 0.4.0) and the asset URL to flow through.
 func TestCheckUpdate_CacheMiss200(t *testing.T) {
 	useTestCacheDir(t, t.TempDir())
 
@@ -144,10 +144,10 @@ func TestCheckUpdate_CacheMiss200(t *testing.T) {
 		w.Header().Set("ETag", `W/"fresh-etag"`)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
-		  "tag_name": "v0.3.0",
+		  "tag_name": "v0.4.0",
 		  "body": "release notes here",
 		  "assets": [
-		    {"name": "localfx-host-setup-0.3.0.exe", "browser_download_url": "https://example.invalid/dl.exe"},
+		    {"name": "localfx-host-setup-0.4.0.exe", "browser_download_url": "https://example.invalid/dl.exe"},
 		    {"name": "checksums.txt", "browser_download_url": "https://example.invalid/c.txt"}
 		  ]
 		}`))
@@ -163,11 +163,11 @@ func TestCheckUpdate_CacheMiss200(t *testing.T) {
 	if d.Cached {
 		t.Errorf("Cached: got true, want false (live response)")
 	}
-	if d.LatestVersion != "0.3.0" {
-		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.3.0")
+	if d.LatestVersion != "0.4.0" {
+		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.4.0")
 	}
 	if !d.HasUpdate {
-		t.Errorf("HasUpdate: got false, want true (current=%s, latest=0.3.0)", version.Version)
+		t.Errorf("HasUpdate: got false, want true (current=%s, latest=0.4.0)", version.Version)
 	}
 	if d.DownloadURL != "https://example.invalid/dl.exe" {
 		t.Errorf("DownloadURL: got %q, want %q", d.DownloadURL, "https://example.invalid/dl.exe")
@@ -190,7 +190,7 @@ func TestCheckUpdate_CacheMiss304(t *testing.T) {
 	useTestCacheDir(t, t.TempDir())
 	seedCache(t, updateCache{
 		CheckedAtUnixMs: time.Now().Add(-48 * time.Hour).UnixMilli(),
-		LatestTag:       "v0.3.0",
+		LatestTag:       "v0.4.0",
 		ETag:            `W/"prev-etag"`,
 		LastStatusCode:  200,
 	})
@@ -213,8 +213,8 @@ func TestCheckUpdate_CacheMiss304(t *testing.T) {
 	if d.Cached {
 		t.Errorf("Cached: got true, want false (304 with refreshed timestamp counts as fresh)")
 	}
-	if d.LatestVersion != "0.3.0" {
-		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.3.0")
+	if d.LatestVersion != "0.4.0" {
+		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.4.0")
 	}
 	// Verify the on-disk timestamp moved forward by reading back the cache.
 	path, _ := resolveCachePath()
@@ -239,7 +239,7 @@ func TestCheckUpdate_CacheMiss403(t *testing.T) {
 	staleTs := time.Now().Add(-48 * time.Hour).UnixMilli()
 	seedCache(t, updateCache{
 		CheckedAtUnixMs: staleTs,
-		LatestTag:       "v0.3.0",
+		LatestTag:       "v0.4.0",
 		ETag:            `W/"prev"`,
 		LastStatusCode:  200,
 	})
@@ -259,8 +259,8 @@ func TestCheckUpdate_CacheMiss403(t *testing.T) {
 	if !d.Cached {
 		t.Errorf("Cached: got false, want true (403 fallback)")
 	}
-	if d.LatestVersion != "0.3.0" {
-		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.3.0")
+	if d.LatestVersion != "0.4.0" {
+		t.Errorf("LatestVersion: got %q, want %q", d.LatestVersion, "0.4.0")
 	}
 	// Critical: timestamp on disk must NOT have advanced — otherwise the
 	// next call would be a within-window hit and we'd never retry past
@@ -386,18 +386,18 @@ func TestCompareSemver(t *testing.T) {
 		want int
 	}{
 		// Numeric ordering.
-		{"0.2.1", "0.3.0", -1},
-		{"0.3.0", "0.2.1", 1},
-		{"0.3.0", "0.3.0", 0},
+		{"0.2.1", "0.4.0", -1},
+		{"0.4.0", "0.2.1", 1},
+		{"0.4.0", "0.4.0", 0},
 		// Per SemVer §11: pre-release < release.
-		{"0.3.0-rc1", "0.3.0", -1},
-		{"0.3.0", "0.3.0-rc1", 1},
+		{"0.4.0-rc1", "0.4.0", -1},
+		{"0.4.0", "0.4.0-rc1", 1},
 		// Pre-release vs pre-release falls back to lexical.
-		{"0.3.0-rc1", "0.3.0-rc2", -1},
+		{"0.4.0-rc1", "0.4.0-rc2", -1},
 		// Leading "v" is stripped.
-		{"v0.3.0", "0.3.0", 0},
+		{"v0.4.0", "0.4.0", 0},
 		// Different component counts still compare numerically.
-		{"0.3", "0.3.0", 0},
+		{"0.4", "0.4.0", 0},
 		{"1.0", "0.9.9", 1},
 	}
 	for _, tc := range cases {
