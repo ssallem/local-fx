@@ -1,6 +1,7 @@
 import { useExplorerStore } from "../store/explorer";
 import type { IpcError } from "../ipc";
 import { t } from "../utils/i18n";
+import { HostMissingOnboarding } from "./HostMissingOnboarding";
 
 function installHint(err: IpcError): string | null {
   if (err.code === "E_HOST_NOT_FOUND") {
@@ -36,6 +37,21 @@ export function ErrorBanner(): JSX.Element | null {
   const currentPath = useExplorerStore((s) => s.currentPath);
 
   if (!error) return null;
+
+  // E_HOST_NOT_FOUND is a first-run / install-state failure rather than a
+  // recoverable runtime error — show a full-panel onboarding view instead of
+  // the dismissible banner. The store clears `error` to null on the next
+  // successful loadDrives(), at which point this branch unmounts naturally.
+  if (error.code === "E_HOST_NOT_FOUND") {
+    return (
+      <HostMissingOnboarding
+        onRetry={async () => {
+          await loadDrives();
+        }}
+        onDismiss={clearError}
+      />
+    );
+  }
 
   const hint = installHint(error);
 

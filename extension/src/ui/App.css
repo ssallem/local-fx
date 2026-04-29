@@ -788,6 +788,41 @@ button:disabled {
   border-color: #d63939;
 }
 
+/* T6 — opt-in update notification toast.
+   Distinct accent (blue) from job toasts so users don't mistake it for a
+   completed copy/move. No auto-dismiss — see UpdateToast.tsx. */
+.progress-toast.state-update-available {
+  border-color: #2563eb;
+}
+
+/* T6 — settings modal toggle row styling. Reuses .dialog/.dialog-buttons
+   from ConfirmDialog so this only needs the row-level layout rules. */
+.update-settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.update-settings-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.update-settings-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.update-settings-toggle input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .progress-toast-header {
   display: flex;
   align-items: center;
@@ -1021,4 +1056,167 @@ button:disabled {
   .failure-list td code {
     background: rgba(255, 255, 255, 0.08);
   }
+}
+
+/* -------------------------------------------------------------------------
+   T3 — HostMissingOnboarding (full-panel view replacing the "host not found"
+   error banner). Reuses existing color tokens so it inherits dark mode.
+   ------------------------------------------------------------------------- */
+
+.onboarding-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  max-width: 640px;
+  margin: 32px auto;
+  padding: 28px 32px;
+  background: var(--header-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fg);
+}
+
+.onboarding-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.onboarding-subtitle {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.onboarding-macos-pending {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.onboarding-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.onboarding-step-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.onboarding-step-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.onboarding-step-caption {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.onboarding-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.onboarding-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  background: var(--accent);
+}
+
+.onboarding-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.onboarding-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.onboarding-btn-secondary:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.onboarding-btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.onboarding-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: onboarding-spin 0.8s linear infinite;
+}
+
+@keyframes onboarding-spin {
+  to { transform: rotate(360deg); }
+}
+
+.onboarding-retry-exhausted {
+  margin: 4px 0 0;
+  padding: 8px 12px;
+  background: var(--error-bg);
+  color: var(--error-fg);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.onboarding-log-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
 }
