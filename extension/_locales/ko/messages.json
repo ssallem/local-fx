@@ -565,5 +565,159 @@
   "toast_result_move_title": {
     "message": "이동 결과",
     "description": "FailureSummary title when the terminated job was a move."
+  },
+
+  "onboarding_title": {
+    "message": "네이티브 호스트가 필요합니다",
+    "description": "Heading on the full-panel onboarding view shown when the native messaging host is missing."
+  },
+  "onboarding_subtitle": {
+    "message": "탭 탐색기가 로컬 드라이브를 읽으려면 작은 도우미 앱이 필요합니다. 한 번만 설치하면 됩니다.",
+    "description": "Single-sentence explanation under the onboarding title."
+  },
+  "onboarding_step_1": {
+    "message": "아래 \"인스톨러 다운로드\" 버튼을 누르세요.",
+    "description": "Onboarding step 1 — primary CTA."
+  },
+  "onboarding_step_caption_1": {
+    "message": "Click \"Download installer\".",
+    "description": "Secondary line under step 1 (English caption beneath localized text)."
+  },
+  "onboarding_step_2": {
+    "message": "다운로드된 .exe 파일을 더블클릭하세요.",
+    "description": "Onboarding step 2 — run the installer."
+  },
+  "onboarding_step_caption_2": {
+    "message": "Double-click the downloaded .exe.",
+    "description": "Secondary line under step 2."
+  },
+  "onboarding_step_3": {
+    "message": "SmartScreen 경고가 뜨면 \"추가 정보\" → \"실행\"을 누르세요.",
+    "description": "Onboarding step 3 — handle SmartScreen warning."
+  },
+  "onboarding_step_caption_3": {
+    "message": "SmartScreen \"More info\" → \"Run\".",
+    "description": "Secondary line under step 3."
+  },
+  "onboarding_step_4": {
+    "message": "설치가 끝나면 아래 \"재시도\" 버튼을 누르세요.",
+    "description": "Onboarding step 4 — finish by retrying the host connection."
+  },
+  "onboarding_step_caption_4": {
+    "message": "Click \"Retry\" after install.",
+    "description": "Secondary line under step 4."
+  },
+  "onboarding_download_btn": {
+    "message": "인스톨러 다운로드",
+    "description": "Primary button label in the onboarding view (Windows path)."
+  },
+  "onboarding_download_btn_unavailable": {
+    "message": "Windows 전용 (현재 OS 미지원)",
+    "description": "Disabled-button label shown when the user is not on Windows."
+  },
+  "onboarding_retry_btn": {
+    "message": "재시도",
+    "description": "Secondary button label in the onboarding view that re-attempts host connection."
+  },
+  "onboarding_retry_in_progress": {
+    "message": "재시도 중… ($attempt$/4)",
+    "description": "Retry button label while a retry sequence is in flight. The /4 denominator counts ALL attempts including the immediate first try (attempt 1 = no wait, attempts 2-4 = backoff-gated). Keep MAX_RETRY_ATTEMPTS in HostMissingOnboarding.tsx in lock-step with this denominator.",
+    "placeholders": {
+      "attempt": { "content": "$1", "example": "2" }
+    }
+  },
+  "onboarding_retry_exhausted": {
+    "message": "여전히 호스트가 발견되지 않습니다. 인스톨러가 정상 종료되었는지 확인하세요.",
+    "description": "Inline message shown when all 4 retry attempts have failed."
+  },
+  "onboarding_macos_pending": {
+    "message": "macOS 인스톨러는 v0.4.x에 제공 예정입니다. 지금은 소스에서 빌드해 주세요.",
+    "description": "Notice shown to macOS users that no signed installer is available yet."
+  },
+  "onboarding_log_hint": {
+    "message": "문제가 발생하면 %LOCALAPPDATA%\\LocalFx\\install.log 를 확인하세요.",
+    "description": "Small hint shown at the bottom of the onboarding view pointing at the install log path."
+  },
+  "onboarding_dismiss": {
+    "message": "기존 오류 화면 보기",
+    "description": "Optional onboarding dismiss button — falls back to the plain error banner."
+  },
+
+  "toolbar_settings": {
+    "message": "설정",
+    "description": "aria-label for the toolbar settings (gear) button."
+  },
+  "toolbar_settings_title": {
+    "message": "설정",
+    "description": "Tooltip for the toolbar settings (gear) button."
+  },
+
+  "update_settings_title": {
+    "message": "업데이트 자동 확인",
+    "description": "Title of the update-check settings modal."
+  },
+  "update_settings_description": {
+    "message": "활성화하면 네이티브 호스트가 24시간에 한 번 GitHub Releases를 조회해 새 버전이 있는지 확인합니다.",
+    "description": "Body text under the update-check settings title."
+  },
+  "update_settings_toggle_label": {
+    "message": "자동으로 업데이트 확인 (24시간)",
+    "description": "Label next to the update-check toggle checkbox."
+  },
+  "update_settings_env_var_hint": {
+    "message": "참고: 호스트 환경에서 LOCALFX_DISABLE_UPDATE_CHECK=1 을 설정하면 이 토글과 무관하게 업데이트 확인이 강제 비활성화됩니다.",
+    "description": "Help text explaining the host-side override env var."
+  },
+
+  "update_consent_title": {
+    "message": "개인정보 안내",
+    "description": "Title of the consent dialog shown the first time the user enables update checks."
+  },
+  "update_consent_body": {
+    "message": "업데이트 자동 확인을 켜면 확장의 개인정보 보호 수준이 변경됩니다. 아래 내용을 확인해주세요:",
+    "description": "Lead paragraph of the consent dialog."
+  },
+  "update_consent_bullet_what": {
+    "message": "24시간마다 GitHub API에 1회 요청을 보냅니다.",
+    "description": "Consent bullet — what the feature does."
+  },
+  "update_consent_bullet_sent": {
+    "message": "GitHub에는 User-Agent 문자열과 IP 주소만 노출됩니다.",
+    "description": "Consent bullet — what is sent."
+  },
+  "update_consent_bullet_not_sent": {
+    "message": "파일 경로, 파일 내용, 사용 통계는 전송되지 않습니다.",
+    "description": "Consent bullet — what is NOT sent."
+  },
+  "update_consent_bullet_optout": {
+    "message": "같은 설정 패널에서 언제든지 끌 수 있습니다.",
+    "description": "Consent bullet — opt-out reassurance."
+  },
+  "update_consent_agree": {
+    "message": "동의",
+    "description": "Confirm button on the consent dialog."
+  },
+
+  "update_toast_title": {
+    "message": "새 버전: $version$",
+    "description": "Persistent toast title when a newer release was found.",
+    "placeholders": {
+      "version": { "content": "$1", "example": "0.3.1" }
+    }
+  },
+  "update_toast_current_version": {
+    "message": "현재 버전: $version$",
+    "description": "Sub-line in the update toast showing the installed version.",
+    "placeholders": {
+      "version": { "content": "$1", "example": "0.0.2" }
+    }
+  },
+  "update_toast_download_button": {
+    "message": "다운로드",
+    "description": "Action button on the update toast that opens the release URL."
+  },
+  "update_toast_host_disabled": {
+    "message": "호스트 환경에서 업데이트 확인이 비활성화되어 있습니다.",
+    "description": "Info message shown when the host returned E_DISABLED."
   }
 }

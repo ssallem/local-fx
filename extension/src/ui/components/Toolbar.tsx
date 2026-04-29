@@ -5,11 +5,16 @@ import { Breadcrumb } from "./Breadcrumb";
 interface Props {
   onToggleDevPanel: () => void;
   onCreateFolder: () => void;
+  // T6 — opens the update-check settings modal. Optional so existing
+  // tests/storybook entries that mount Toolbar without the new wiring
+  // still type-check; the button no-ops when missing.
+  onOpenSettings?: () => void;
 }
 
 export function Toolbar({
   onToggleDevPanel,
-  onCreateFolder
+  onCreateFolder,
+  onOpenSettings
 }: Props): JSX.Element {
   const currentPath = useExplorerStore((s) => s.currentPath);
   const historyIndex = useExplorerStore((s) => s.historyIndex);
@@ -82,6 +87,17 @@ export function Toolbar({
       </div>
       <Breadcrumb path={currentPath} />
       <div className="toolbar-spacer" />
+      {onOpenSettings && (
+        <button
+          type="button"
+          className="toolbar-dev"
+          onClick={onOpenSettings}
+          title={t("toolbar_settings_title")}
+          aria-label={t("toolbar_settings")}
+        >
+          ⚙
+        </button>
+      )}
       <button
         type="button"
         className="toolbar-dev"
@@ -89,7 +105,7 @@ export function Toolbar({
         title={t("toolbar_dev_panel_title")}
         aria-label={t("toolbar_dev_panel")}
       >
-        ⚙
+        🛠
       </button>
     </header>
   );

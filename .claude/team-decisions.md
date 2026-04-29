@@ -479,3 +479,84 @@ cd D:\Dev\Chrome\local-fx\installer\windows
 - GitHub Releases 자동 업로드 (gh CLI workflow)
 - 확장 안 onboarding 페이지 ("호스트 미설치 → 다운로드 링크")
 
+## 미션 9 (2026-04-29): 4-track 설치 자동화 (T1+T2+T3+T6)
+
+### 배경
+- 사용자: "code sign은 desktop에서 가능해. 이 설치과정을 자동화 하는 방법을 더 심도있게 다각적으로 고민해봐."
+- Plan Mode로 9 트랙 평가 → 4개 핵심(T1+T2+T3+T6) + 1개 옵션(T4) 채택
+- 사용자 결정: SafeNet USB(EV) cert / macOS v0.4.x 미룸 / 자동 업데이트 옵트인 추가
+- Plan 파일: `C:\Users\ssallem\.claude\plans\code-melodic-russell.md`
+
+### T1 — Authenticode 코드 서명 (SafeNet USB EV)
+- 신규 `installer/windows/lib/Signing.psm1` — `Find-SignTool` / `Test-SignedAndValid` / `Sign-Binary` exports
+- `build-setup.ps1` `-Sign` + `-ForceSign` switch 추가, 2단계 서명 (fx-host.exe pre-ISCC + setup.exe post-ISCC)
+- timestamp 재시도 chain: DigiCert → Sectigo → GlobalSign
+- cert selector: `LOCALFX_SIGN_THUMBPRINT` > `LOCALFX_SIGN_SUBJECT` > `/a` (auto-pick)
+- `LOCALFX_SIGN_CSP` env-var override (KSP 강제 지정 시)
+- env-var 미설정 시 unsigned dev build 유지 (CI 안전 fallback)
+
+### T2 — GitHub Actions CI/CD (Hybrid 모델)
+- 신규 `.github/workflows/release.yml` — tag `v*` 트리거, 4 jobs:
+  1. `build-host-windows` (Go 1.22)
+  2. `build-extension` (Node 20, npm run build:prod)
+  3. `package-windows` (choco innosetup 6.2.2 + build-setup.ps1 unsigned)
+  4. `release-draft` (gh release create --draft, idempotent guard)
+- 신규 `installer/windows/sign-and-publish.ps1` — 로컬 sign-and-publish:
+  - `gh release download` → `Sign-Binary` (SafeNet PIN 1회) → `gh release upload --clobber` → `gh release edit --draft=false`
+  - throw-based Fail + outer try/catch/finally → temp dir 누수 방지
+  - SHA256SUMS.txt에 .exe + .zip 모두 포함 (regen 시 zip 보존)
+  - stable-named alias `localfx-host-setup-windows.exe` 생성 (T3 onboarding URL용)
+
+### T3 — In-extension Onboarding (호스트 미발견 시 1-click 회복)
+- 신규 `extension/src/ui/components/HostMissingOnboarding.tsx` (199줄) — 전체 panel:
+  - OS 자동 감지 (`navigator.userAgentData` + `navigator.platform` fallback)
+  - "다운로드" 버튼 → `window.open(latest_release_url, "_blank", "noopener,noreferrer")` (보안 강화)
+  - "재시도" 버튼 → exponential backoff (0/2/5/10s, max 4회), useRef-based re-entry guard
+  - 4단계 한국어 가이드 + 영어 부제
+- `ErrorBanner.tsx` `error.code === "E_HOST_NOT_FOUND"` 시 onboarding으로 위임
+- en/ko locales 18 신규 i18n 키
+- App.css `.onboarding-*` 스타일 (~165줄, dark/light 테마)
+
+### T6 — 옵트인 호스트 자동 업데이트 (default OFF)
+- 신규 `native-host/internal/ops/update.go` (516줄) — `checkUpdate` op:
+  - 24h 캐시 (`%LOCALAPPDATA%\LocalFx\update-cache.json`, ETag 협상)
+  - HTTPS GET to `api.github.com/repos/ssallem/local-fx/releases/latest`
+  - User-Agent: `local-fx/<ver> (+https://github.com/ssallem/local-fx)`
+  - 10s timeout
+  - draft/prerelease 응답 거부
+  - `LOCALFX_DISABLE_UPDATE_CHECK=1` env var → `E_DISABLED` (defense in depth)
+  - 캐시 dir override는 package-level `SetTestCacheDir` (테스트 전용, wire 노출 X)
+- 신규 `update_test.go` (321줄) — 8 케이스 (cache hit, 200/304/403, env disable, draft 거부, prerelease 거부, semver edge cases)
+- 확장: `UpdateCheckSettings.tsx` (251줄) 모달 + 동의 다이얼로그 + chrome.alarms 스케줄 (1분 후 첫 fire + 24h 주기)
+- `UpdateToast.tsx` (73줄) 영구 toast + "다운로드" 버튼 (noopener/noreferrer)
+- `background.ts` chrome.alarms.onAlarm + in-flight guard + broadcastToTabs
+- `Toolbar.tsx` ⚙ 설정 버튼 (dev panel은 🛠로 변경)
+- `docs/PRIVACY.md` 옵트인 업데이트 섹션 (전송 데이터 / 옵트아웃 경로 / 캐시 위치 / 트레이드오프)
+
+### Reviewer 결과
+- T1+T2 1차: NEEDS_REVISION (CRITICAL 1: Fail/exit/finally; HIGH 3: SHA256SUMS zip / gh idempotent / pwsh 중첩) → fix 후 PASS
+- T3+T6 1차: NEEDS_REVISION (T3 CRITICAL 1: noopener; T6 CRITICAL 2: cache dir wire / draft 필터) → fix 후 PASS
+- compareSemver pre-existing test fail 1건 직접 1줄 수정 → 전체 테스트 PASS
+
+### 빌드 검증
+- `go build ./...`: PASS
+- `go vet ./...`: PASS
+- `go test ./internal/ops/...`: PASS (all)
+- TS typecheck + vite build: implementer 보고 PASS (node_modules 미설치로 외부 재검증 불가)
+
+### 변경 통계
+- 22 파일 (modified 13 + new 9)
+- +945 lines insertion, -12 deletion
+
+### 사용자 다음 액션 (이번 세션 외)
+1. **T1 검증**: SafeNet USB 꽂고 SAC 설치 → `$env:LOCALFX_SIGN_THUMBPRINT="<thumbprint>"` 설정 → `pwsh installer\windows\build-setup.ps1 -Sign` 실행 → signtool verify 통과 확인
+2. **T2 trigger**: `git tag v0.3.0-test && git push origin v0.3.0-test` → Actions 통과 → `pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.0-test -DryRun` (USB 꽂은 상태)
+3. **T3 검증**: dev mode 호스트 미설치 상태로 새 탭 열기 → onboarding panel 확인 → 다운로드 → 설치 → 재시도
+4. **T6 검증**: 새 탭 → ⚙ → 토글 ON → 동의 → 1분 후 alarm fire → toast 표시 (또는 cache miss 시)
+
+### 후속 (v0.4.x)
+- T4 (WinGet 등록 + winget-pkgs PR 자동화)
+- T7 (macOS .pkg signed + notarized + homebrew cask)
+- 코드서명 + reputation 누적 모니터링
+- 확장 v0.3.0 Web Store 재배포 (onboarding + 업데이트 토글 포함)
+

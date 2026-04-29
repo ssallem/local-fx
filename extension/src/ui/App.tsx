@@ -25,6 +25,9 @@ import {
   type ConflictStrategyChoice
 } from "./components/dialogs";
 import { ProgressToasts } from "./components/ProgressToasts";
+import { UpdateCheckSettings } from "./components/UpdateCheckSettings";
+import { UpdateToast } from "./components/UpdateToast";
+import { useUpdate, type UpdateAvailable } from "./store/update";
 import { basename, formatBytes, joinPath } from "./utils/format";
 import { t } from "./utils/i18n";
 import { IpcError, stat as ipcStat } from "./ipc";
@@ -172,6 +175,15 @@ export function App(): JSX.Element {
 
   const [devOpen, setDevOpen] = useState(false);
   const toggleDev = useCallback(() => setDevOpen((v) => !v), []);
+
+  // T6 — settings modal hosting the opt-in update-check toggle. Kept in
+  // local state (not a store) because no other component needs to drive
+  // its open/close. Persistence of the toggle itself lives in
+  // chrome.storage.sync via UpdateCheckSettings — this state is just the
+  // modal's visibility flag.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const [renameDialog, setRenameDialog] = useState<RenameDialogState | null>(
     null
@@ -371,6 +383,53 @@ export function App(): JSX.Element {
   useEffect(() => {
     void loadDrives();
   }, [loadDrives]);
+
+  // T6 — listen for update-available broadcasts from the background SW.
+  // The SW dispatches `{ kind: "update-available", payload: <CheckUpdateData> }`
+  // when an alarm-driven checkUpdate finds a newer release. We route into
+  // useUpdate so <UpdateToast> renders the persistent notification.
+  useEffect(() => {
+    function isUpdateAvailableMessage(msg: unknown): msg is {
+      kind: "update-available";
+      payload: UpdateAvailable;
+    } {
+      if (typeof msg !== "object" || msg === null) return false;
+      const m = msg as { kind?: unknown; payload?: unknown };
+      if (m.kind !== "update-available") return false;
+      const p = m.payload as Record<string, unknown> | undefined;
+      return (
+        !!p &&
+        typeof p.latestVersion === "string" &&
+        typeof p.currentVersion === "string"
+      );
+    }
+    function isHostDisabledMessage(msg: unknown): boolean {
+      if (typeof msg !== "object" || msg === null) return false;
+      return (msg as { kind?: unknown }).kind === "update-host-disabled";
+    }
+    const listener = (msg: unknown): false => {
+      if (isUpdateAvailableMessage(msg)) {
+        useUpdate.getState().setAvailable({
+          latestVersion: msg.payload.latestVersion,
+          currentVersion: msg.payload.currentVersion,
+          downloadUrl: msg.payload.downloadUrl ?? "",
+          releaseNotes: msg.payload.releaseNotes ?? "",
+          checkedAtMs: msg.payload.checkedAtMs ?? 0
+        });
+      } else if (isHostDisabledMessage(msg)) {
+        useUpdate.getState().setHostDisabled(true);
+      }
+      // Returning false signals "I won't call sendResponse asynchronously",
+      // matching the chrome.runtime.onMessage contract for fire-and-forget
+      // broadcasts. Returning true would keep the channel open for a reply
+      // we never send.
+      return false;
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+    };
+  }, []);
 
   // Phase 2.4 — auto-open FailureSummary for any job that terminates with
   // failures. We subscribe to the jobs store imperatively so the modal
@@ -739,6 +798,7 @@ export function App(): JSX.Element {
       <Toolbar
         onToggleDevPanel={toggleDev}
         onCreateFolder={openCreateFolder}
+        onOpenSettings={openSettings}
       />
       <ErrorBanner />
       {currentPath === null ? (
@@ -807,6 +867,8 @@ export function App(): JSX.Element {
       )}
 
       <ProgressToasts />
+      <UpdateToast />
+      <UpdateCheckSettings open={settingsOpen} onClose={closeSettings} />
 
       {conflictDialog && (
         <ConflictDialog

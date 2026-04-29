@@ -565,5 +565,159 @@
   "toast_result_move_title": {
     "message": "Move result",
     "description": "FailureSummary title when the terminated job was a move."
+  },
+
+  "onboarding_title": {
+    "message": "Native host required",
+    "description": "Heading on the full-panel onboarding view shown when the native messaging host is missing."
+  },
+  "onboarding_subtitle": {
+    "message": "Tab Explorer needs a small companion app on your computer to read local drives. Install it once and you're done.",
+    "description": "Single-sentence explanation under the onboarding title."
+  },
+  "onboarding_step_1": {
+    "message": "Click \"Download installer\" below.",
+    "description": "Onboarding step 1 — primary CTA."
+  },
+  "onboarding_step_caption_1": {
+    "message": "Click \"Download installer\".",
+    "description": "Secondary line under step 1 (English caption beneath localized text)."
+  },
+  "onboarding_step_2": {
+    "message": "Double-click the downloaded .exe to run it.",
+    "description": "Onboarding step 2 — run the installer."
+  },
+  "onboarding_step_caption_2": {
+    "message": "Double-click the downloaded .exe.",
+    "description": "Secondary line under step 2."
+  },
+  "onboarding_step_3": {
+    "message": "If SmartScreen appears, click \"More info\" → \"Run anyway\".",
+    "description": "Onboarding step 3 — handle SmartScreen warning."
+  },
+  "onboarding_step_caption_3": {
+    "message": "SmartScreen \"More info\" → \"Run\".",
+    "description": "Secondary line under step 3."
+  },
+  "onboarding_step_4": {
+    "message": "Once installation finishes, click \"Retry\" below.",
+    "description": "Onboarding step 4 — finish by retrying the host connection."
+  },
+  "onboarding_step_caption_4": {
+    "message": "Click \"Retry\" after install.",
+    "description": "Secondary line under step 4."
+  },
+  "onboarding_download_btn": {
+    "message": "Download installer",
+    "description": "Primary button label in the onboarding view (Windows path)."
+  },
+  "onboarding_download_btn_unavailable": {
+    "message": "Windows only (current OS not supported)",
+    "description": "Disabled-button label shown when the user is not on Windows."
+  },
+  "onboarding_retry_btn": {
+    "message": "Retry",
+    "description": "Secondary button label in the onboarding view that re-attempts host connection."
+  },
+  "onboarding_retry_in_progress": {
+    "message": "Retrying… ($attempt$/4)",
+    "description": "Retry button label while a retry sequence is in flight. The /4 denominator counts ALL attempts including the immediate first try (attempt 1 = no wait, attempts 2-4 = backoff-gated). Keep MAX_RETRY_ATTEMPTS in HostMissingOnboarding.tsx in lock-step with this denominator.",
+    "placeholders": {
+      "attempt": { "content": "$1", "example": "2" }
+    }
+  },
+  "onboarding_retry_exhausted": {
+    "message": "Still not found. Verify the installer completed successfully.",
+    "description": "Inline message shown when all 4 retry attempts have failed."
+  },
+  "onboarding_macos_pending": {
+    "message": "macOS installer is coming in v0.4.x. For now, please build from source.",
+    "description": "Notice shown to macOS users that no signed installer is available yet."
+  },
+  "onboarding_log_hint": {
+    "message": "If anything goes wrong, check %LOCALAPPDATA%\\LocalFx\\install.log",
+    "description": "Small hint shown at the bottom of the onboarding view pointing at the install log path."
+  },
+  "onboarding_dismiss": {
+    "message": "Show details instead",
+    "description": "Optional onboarding dismiss button — falls back to the plain error banner."
+  },
+
+  "toolbar_settings": {
+    "message": "Settings",
+    "description": "aria-label for the toolbar settings (gear) button."
+  },
+  "toolbar_settings_title": {
+    "message": "Settings",
+    "description": "Tooltip for the toolbar settings (gear) button."
+  },
+
+  "update_settings_title": {
+    "message": "Auto-update check",
+    "description": "Title of the update-check settings modal."
+  },
+  "update_settings_description": {
+    "message": "When enabled, the native host queries GitHub Releases at most once per 24 hours to check for updates.",
+    "description": "Body text under the update-check settings title."
+  },
+  "update_settings_toggle_label": {
+    "message": "Check for updates automatically (24h)",
+    "description": "Label next to the update-check toggle checkbox."
+  },
+  "update_settings_env_var_hint": {
+    "message": "Tip: set LOCALFX_DISABLE_UPDATE_CHECK=1 in the host environment to force-disable update checks regardless of this toggle.",
+    "description": "Help text explaining the host-side override env var."
+  },
+
+  "update_consent_title": {
+    "message": "Privacy notice",
+    "description": "Title of the consent dialog shown the first time the user enables update checks."
+  },
+  "update_consent_body": {
+    "message": "Enabling auto-update check changes the privacy posture of this extension. Please review:",
+    "description": "Lead paragraph of the consent dialog."
+  },
+  "update_consent_bullet_what": {
+    "message": "Sends a single GitHub API request every 24 hours.",
+    "description": "Consent bullet — what the feature does."
+  },
+  "update_consent_bullet_sent": {
+    "message": "Only the User-Agent string and your IP address are visible to GitHub.",
+    "description": "Consent bullet — what is sent."
+  },
+  "update_consent_bullet_not_sent": {
+    "message": "No file paths, file contents, or telemetry are sent.",
+    "description": "Consent bullet — what is NOT sent."
+  },
+  "update_consent_bullet_optout": {
+    "message": "You can disable this anytime from the same settings panel.",
+    "description": "Consent bullet — opt-out reassurance."
+  },
+  "update_consent_agree": {
+    "message": "Agree",
+    "description": "Confirm button on the consent dialog."
+  },
+
+  "update_toast_title": {
+    "message": "New version: $version$",
+    "description": "Persistent toast title when a newer release was found.",
+    "placeholders": {
+      "version": { "content": "$1", "example": "0.3.1" }
+    }
+  },
+  "update_toast_current_version": {
+    "message": "Current: $version$",
+    "description": "Sub-line in the update toast showing the installed version.",
+    "placeholders": {
+      "version": { "content": "$1", "example": "0.0.2" }
+    }
+  },
+  "update_toast_download_button": {
+    "message": "Download",
+    "description": "Action button on the update toast that opens the release URL."
+  },
+  "update_toast_host_disabled": {
+    "message": "Update check is disabled by the host environment.",
+    "description": "Info message shown when the host returned E_DISABLED."
   }
 }

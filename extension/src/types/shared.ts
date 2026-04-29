@@ -27,7 +27,9 @@ export type Op =
   | "copy"
   | "cancel"
   // Phase 2.4 — streaming move (UI-resolved conflicts)
-  | "move";
+  | "move"
+  // T6 — opt-in update check (default OFF; gated by extension settings)
+  | "checkUpdate";
 
 export interface Request<T = unknown> {
   id: string;
@@ -95,7 +97,10 @@ export type ErrorCode =
   | "E_INTERNAL"
   // --- extension-local transport codes (not in §8) ---
   | "E_TIMEOUT"
-  | "E_UNKNOWN";
+  | "E_UNKNOWN"
+  // --- T6 op-local code: emitted only by checkUpdate when host honours
+  // the LOCALFX_DISABLE_UPDATE_CHECK=1 env-var escape hatch ---
+  | "E_DISABLED";
 
 // -----------------------------------------------------------------------------
 // op payload schemas — authority: docs/PROTOCOL.md §7
@@ -344,6 +349,40 @@ export interface MoveArgs {
   conflict?: Exclude<ConflictStrategy, "prompt">;
 }
 
+// -----------------------------------------------------------------------------
+// T6 — opt-in update check.
+//
+// Wire authority: native-host/internal/ops/update.go (CheckUpdateData).
+// Privacy authority: docs/PRIVACY.md "옵트인 업데이트 확인" section.
+//
+// CheckUpdateArgs is intentionally `Record<string, never>` (typed empty
+// object) so the request<"checkUpdate"> overload accepts `undefined` via
+// the OpArgsMap entry below — callers don't have to pass `{}`.
+// -----------------------------------------------------------------------------
+
+export type CheckUpdateArgs = Record<string, never>;
+
+export interface CheckUpdateData {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  // Populated only when hasUpdate=true and a matching installer asset was
+  // found on the release. UI should fall back to the release page URL when
+  // this is absent.
+  downloadUrl?: string;
+  // First 500 chars of the release Markdown body, when hasUpdate=true.
+  // Capped on the host side; UI should treat as plain text (no Markdown
+  // rendering required).
+  releaseNotes?: string;
+  // True when this response came from the on-disk 24h cache without a live
+  // GitHub call. UI uses this only for diagnostics (e.g. "검사 시간:
+  // <KST>") — the toast itself shouldn't differ.
+  cached: boolean;
+  // Unix milliseconds when the underlying network check completed (NOT
+  // when the cache was last read). UI may format with `new Date(ms)`.
+  checkedAtMs: number;
+}
+
 // PROTOCOL.md §7.13 — cancel targets an IN-FLIGHT streaming op by its id.
 // The cancel request itself is a normal non-streaming op: it returns a
 // Response with `accepted` indicating whether the Host actually knew about
@@ -438,6 +477,10 @@ export interface OpArgsMap {
   cancel: CancelArgs;
   // Phase 2.4 — streaming move (UI-resolved conflicts)
   move: MoveArgs;
+  // T6 — opt-in update check. Args type `undefined` (via the empty-object
+  // alias) so request("checkUpdate") is callable without a second arg via
+  // the OpNoArgs overload.
+  checkUpdate: CheckUpdateArgs | undefined;
 }
 
 export interface OpDataMap {
@@ -457,6 +500,8 @@ export interface OpDataMap {
   cancel: CancelData;
   // Phase 2.4 — same envelope/event shape as copy.
   move: EmptyData;
+  // T6 — opt-in update check.
+  checkUpdate: CheckUpdateData;
 }
 
 // Ops that accept no args (or only an optional args payload). Used by the

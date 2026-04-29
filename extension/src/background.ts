@@ -1,5 +1,6 @@
 import {
   HOST_NAME,
+  type CheckUpdateData,
   type ErrorCode,
   type Request,
   type Response,
@@ -26,6 +27,14 @@ const STREAM_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const KEEPALIVE_ALARM = "local-explorer-keepalive";
 const KEEPALIVE_PERIOD_MIN = 0.5;
 
+// T6 — opt-in update check. Constants are duplicated (rather than imported
+// from UpdateCheckSettings.tsx) so the SW bundle doesn't pull in the React
+// component graph. A rename in either place would be caught by the
+// alarm-name mismatch in Chrome's behaviour, surfacing fast.
+const UPDATE_CHECK_ALARM = "checkUpdate";
+const UPDATE_CHECKS_ENABLED_KEY = "updateChecksEnabled";
+const UPDATE_PROTOCOL_VERSION = 2;
+
 let port: chrome.runtime.Port | null = null;
 const pending = new Map<string, Pending>();
 
@@ -35,11 +44,152 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // F-6: alarm handler is a no-op — its only job is to wake the SW so
 // setTimeout timers and the Port message listeners stay scheduled.
+//
+// T6: when the alarm name is UPDATE_CHECK_ALARM, dispatch the opt-in
+// update check. The handler is async-aware via void promise to keep the
+// addListener callback synchronous (Chrome's alarm contract).
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== KEEPALIVE_ALARM) return;
-  // intentionally empty: wake-up side-effect is the whole point.
-  return;
+  if (alarm.name === KEEPALIVE_ALARM) {
+    // intentionally empty: wake-up side-effect is the whole point.
+    return;
+  }
+  if (alarm.name === UPDATE_CHECK_ALARM) {
+    void runUpdateCheck();
+    return;
+  }
 });
+
+// T6 — read the opt-in toggle from chrome.storage.sync. Treats absent /
+// failed reads as `false` so a sync hiccup can never accidentally enable
+// the network path (defense in depth alongside the host's env-var gate).
+async function isUpdateCheckEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      chrome.storage.sync.get(UPDATE_CHECKS_ENABLED_KEY, (items: unknown) => {
+        if (chrome.runtime.lastError) {
+          resolve(false);
+          return;
+        }
+        const obj = items as Record<string, unknown>;
+        resolve(obj[UPDATE_CHECKS_ENABLED_KEY] === true);
+      });
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+// T6 — module-level in-flight guard. Two alarms can fire close together
+// (e.g. user toggles off → on quickly, or Chrome catches up missed alarms
+// after an SW wake) — without this guard each fire would issue its own
+// IPC and broadcast a duplicate update toast. console.warn (NOT console.log)
+// is intentional: warnings are visible in chrome://serviceworker-internals
+// for diagnosing skipped fires without polluting normal-path logs.
+let updateCheckInFlight = false;
+
+// T6 — fire a checkUpdate IPC and broadcast the result to UI tabs.
+// Reuses ensurePort()/pending machinery so the alarm-driven request rides
+// the same SW lifecycle plumbing as user-initiated ops.
+async function runUpdateCheck(): Promise<void> {
+  if (updateCheckInFlight) {
+    console.warn(
+      "[fx] runUpdateCheck: previous run still in flight, skipping this alarm fire"
+    );
+    return;
+  }
+  updateCheckInFlight = true;
+  try {
+    await runUpdateCheckImpl();
+  } finally {
+    updateCheckInFlight = false;
+  }
+}
+
+async function runUpdateCheckImpl(): Promise<void> {
+  if (!(await isUpdateCheckEnabled())) {
+    // Toggle is OFF — never reach the network. The alarm should already
+    // be cleared by UpdateCheckSettings.writeEnabled(false), but a stale
+    // alarm could survive a settings-store rollback; this guard makes
+    // the property "no toggle = no traffic" hold regardless.
+    return;
+  }
+  const active = ensurePort();
+  if (!active) return; // Host unavailable — silently retry on next tick.
+
+  const id = crypto.randomUUID();
+  const req: Request = {
+    id,
+    op: "checkUpdate",
+    protocolVersion: UPDATE_PROTOCOL_VERSION
+  };
+
+  // 30s ceiling — generous because the host's own httpClient timeout is
+  // 10s and we want to give it room to retry once before declaring
+  // failure SW-side. We don't surface this timeout to UI; a missed check
+  // just means the user waits another 24h.
+  const TIMEOUT_MS = 30_000;
+  const timeout = setTimeout(() => {
+    const entry = pending.get(id);
+    if (!entry) return;
+    pending.delete(id);
+    if (pending.size === 0) stopKeepalive();
+    entry.resolve({
+      id,
+      ok: false,
+      error: { code: "E_TIMEOUT", message: "checkUpdate timed out", retryable: true }
+    });
+  }, TIMEOUT_MS);
+
+  const respPromise = new Promise<Response>((resolve) => {
+    pending.set(id, { resolve, timeout });
+  });
+  startKeepalive();
+
+  try {
+    active.postMessage(req);
+  } catch {
+    const entry = pending.get(id);
+    if (entry) {
+      clearTimeout(entry.timeout);
+      pending.delete(id);
+      if (pending.size === 0) stopKeepalive();
+    }
+    return;
+  }
+
+  const resp = (await respPromise) as Response<CheckUpdateData>;
+  if (!resp.ok) {
+    if (resp.error.code === "E_DISABLED") {
+      // Host respects LOCALFX_DISABLE_UPDATE_CHECK=1 — surface a
+      // separate broadcast so the UI can show an info message rather
+      // than silently doing nothing.
+      broadcastToTabs({ kind: "update-host-disabled" });
+    }
+    return;
+  }
+  if (!resp.data.hasUpdate) return; // No new version — nothing to surface.
+  broadcastToTabs({ kind: "update-available", payload: resp.data });
+}
+
+// T6 — fire-and-forget broadcast helper. chrome.runtime.sendMessage with
+// no tab target reaches every extension page; if no listeners are open
+// the promise rejects with "Could not establish connection" which we
+// silently swallow — same pattern as broadcastEvent below.
+function broadcastToTabs(message: unknown): void {
+  try {
+    const maybePromise = chrome.runtime.sendMessage(message);
+    if (
+      maybePromise &&
+      typeof (maybePromise as Promise<unknown>).catch === "function"
+    ) {
+      (maybePromise as Promise<unknown>).catch(() => {
+        /* no listeners — expected when no extension tab is open */
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function startKeepalive(): void {
   // Creating the same-named alarm replaces the existing one, which is cheap.

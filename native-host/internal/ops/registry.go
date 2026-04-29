@@ -110,4 +110,7 @@ func init() {
 	Register("cancel", Cancel)
 	// Phase 2.4 — move (same-volume rename with cross-volume copy-then-delete fallback).
 	RegisterStream("move", Move)
+	// T6 — opt-in update check (default OFF, gated extension-side; host
+	// honours LOCALFX_DISABLE_UPDATE_CHECK=1 as defence-in-depth).
+	Register("checkUpdate", CheckUpdate)
 }

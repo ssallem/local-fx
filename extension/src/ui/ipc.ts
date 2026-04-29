@@ -1,5 +1,6 @@
 import type {
   CancelArgs,
+  CheckUpdateData,
   CopyArgs,
   Drive,
   EmptyData,
@@ -328,6 +329,32 @@ export function moveFile(
   onEvent: StreamListener
 ): StreamHandle<EmptyData> {
   return requestStream("move", args, onEvent);
+}
+
+// -----------------------------------------------------------------------------
+// T6 — opt-in update check helper.
+//
+// The host responds with `E_DISABLED` when LOCALFX_DISABLE_UPDATE_CHECK=1
+// is set in the host's environment. Callers should branch on that code
+// rather than treating it as a generic failure — it's an informational
+// state, not a transport-level error. We deliberately do NOT export an
+// unwrap()-style throwing variant here: collapsing E_DISABLED into a thrown
+// IpcError would force every caller to re-derive "is this a real failure
+// or a user-config opt-out?" via try/catch + code inspection. Returning
+// the raw Response keeps the disabled-vs-error decision explicit and
+// auditable in background.ts.
+// -----------------------------------------------------------------------------
+
+/**
+ * Returns the full Response so callers (notably the SW alarm handler) can
+ * inspect `error.code === "E_DISABLED"` without a try/catch dance. Use
+ * this in code paths where "disabled" is a normal outcome — there is no
+ * throwing variant on purpose; see the section header above.
+ */
+export async function checkUpdateResponse(): Promise<
+  Response<CheckUpdateData>
+> {
+  return request("checkUpdate");
 }
 
 /**
