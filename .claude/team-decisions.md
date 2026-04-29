@@ -420,3 +420,62 @@ cd D:\Dev\Chrome\local-fx\installer\windows
 - `docs/NATIVE_HOST_DISTRIBUTION.md`에 "chrome://extensions ID 확인 → installer CSV 인자로 전달" 워크플로 명시 (별도 PR)
 - GitHub Releases에 v0.2.1 native host 자산(install.ps1 + install.sh + fx-host bin) 패키징 (별도 작업)
 
+## 미션 8 (2026-04-29): Windows 1-click 인스톨러 (Inno Setup .exe)
+
+### 배경
+- 미션 7 패치는 사용자 본인 PC만 해결. 원격 PC owner는 Q1=Windows / Q2=명령 직접 실행 불가 / Q3=fx-host도 install.ps1도 없음.
+- 사용자 요청: "크롬 확장프로그램 설치시 모두 자동으로 설치되게 안돼?" → Chrome 보안 모델상 완전 자동 불가, 단 더블클릭 한 번까지는 가능.
+
+### 전문가 패널 합의
+- 리누스: Chrome 확장이 임의 native binary 자동 설치 불가능. 보안 모델 자체.
+- 파울러: GitHub Release self-contained `.exe` 인스톨러가 합리적 답.
+- 켄트벡: A(zip+ps1)→B(.exe wrapper)→C(코드서명) 단계적. 이번엔 B까지.
+
+### 채택 (Track B)
+- **Inno Setup 6.7.1** (winget으로 user-scope 설치 완료, `C:\Users\<u>\AppData\Local\Programs\Inno Setup 6\ISCC.exe`).
+- **wrapper 전략**: setup.iss는 (1) fx-host.exe + installer/* 를 `{localappdata}\LocalFx\` 에 풀고 (2) 기존 `install.ps1` 을 `-Force -HostBinary <path> -ExtensionId "<dev>,<prod>"` 인자로 자동 실행. → 미션 7의 multi-ID install.ps1 100% 재사용. 코드 중복 0.
+- **권한**: `PrivilegesRequired=lowest` — admin 불필요. 모든 동작 HKCU + %LOCALAPPDATA%.
+- **하드코딩**: prod ID `hkopameeeinhkodnddimfmeogkjnpidf` + dev ID `cjaibkecpdcabflelcjciceofknnpmck` 둘 다 default. (사용자가 dev 모드도 동시에 쓸 수 있음.)
+- **언어**: Inno Setup의 ISL 한국어 + 영어. 사용자 선택.
+- **uninstall**: Inno Setup 자동 등록 → 제어판에서 제거 가능. `[UninstallRun]` 으로 `uninstall.ps1 -Yes` 호출.
+- **출력**: `dist-prod/localfx-host-setup-v0.2.1.exe` (단일 파일, ~4MB 예상: fx-host 3.86MB + installer scripts + Inno Setup runtime).
+- **SmartScreen**: 코드서명 없으므로 첫 실행 시 "추가 정보 → 실행" 1번 클릭 필요. README에 명시.
+
+### 파일 추가 예정
+- `installer/windows/setup.iss` — Inno Setup 스크립트
+- `installer/windows/build-setup.ps1` — `iscc.exe` 호출 빌드 래퍼
+- `installer/windows/README-DEPLOY.ko.md` — 원격 PC owner 한국어 가이드 (3-4단계)
+- `dist-prod/localfx-host-setup-v0.2.1.exe` — 빌드 산출물 (.gitignore 추가)
+
+### 검증 계획
+- Reviewer: setup.iss 코드 리뷰 (path escape, 권한, uninstall 정합성)
+- Smoke test: 격리된 임시 폴더에서 setup.exe `/SILENT` 실행 → manifest + 레지스트리 확인 → uninstall 호출 → 깨끗히 제거 확인
+
+### 진행 결과
+- **[Implementer 1차 완료]** 3 파일 신규: `setup.iss`, `build-setup.ps1`, `README-DEPLOY.ko.md`. 첫 빌드 성공 (3.88MB).
+- **[Reviewer 1차 NEEDS_REVISION]** CRITICAL 1 + HIGH 3:
+  - C-1: `[Run] runhidden` 으로 install.ps1 실패 silent. "Installation Complete"만 보임.
+  - H-1: uninstall.ps1이 자기 부모 디렉터리(`installer/`)를 recursive 삭제 — Inno Setup 추적 정리와 충돌.
+  - H-2: README "확장 ID 다른 경우" — "필요할 수 있음" 모호, self-service 암시.
+  - H-3: README "외부 통신 없음" 미검증.
+- **[Implementer 2차 완료]** 모두 수정:
+  - C-1: `[Run]` 비우고 `[Code] RegisterNativeHost` + `CurStepChanged(ssPostInstall)` 도입. `Exec` 결과코드 검사 → MsgBox 한국어 + `Abort`. PS는 `Start-Transcript ... try { exit $LASTEXITCODE } finally { Stop-Transcript }`로 transcript 보존 (`%LOCALAPPDATA%\LocalFx\install.log`).
+  - H-1: uninstall.ps1에 `LocalFxKeepFiles` env-var contract. `=1` 이면 dir 보존(레지스트리+JSON만 삭제). `[UninstallRun]`이 PS wrapper로 `$env:LocalFxKeepFiles='1'` 설정 후 호출. `RunOnceId` 제거.
+  - H-2/H-3: README 두 문구 명확화. native-host/ grep `net/http|net.Dial|...` 0건 검증 인라인 명시.
+- **[Reviewer 2차 PASS]** 4건 모두 RESOLVED. 신규 LOW 2건만 남음:
+  - LOW-1: `WizardForm.Update;` 누락 → 직접 1줄 수정 완료.
+  - LOW-2: `Get-ChildItem -ErrorAction SilentlyContinue` 권한거부 시 misleading warning — 비현실적 엣지케이스, 후속.
+- **[최종 빌드]** `dist-prod/localfx-host-setup-v0.2.1.exe`, 3.88 MB, SHA256 `82b81b47b230cf59aa8c83c7c8f151a1e834f3fd007fafe7c7df1732a1782ab9`.
+
+### 배포 워크플로 (사용자가 원격 PC owner에게 전달)
+1. `dist-prod/localfx-host-setup-v0.2.1.exe` (3.88 MB) 단일 파일 전달 (이메일/메신저/USB).
+2. `installer/windows/README-DEPLOY.ko.md` 텍스트 함께 전달 (또는 README 내용을 메시지에 그대로 붙임).
+3. 원격 사용자: 더블클릭 → SmartScreen "추가 정보 → 실행" → 언어 → 다음 → 설치 → 마침 → Chrome 재시작 → 완료.
+4. 실패 시 `%LOCALAPPDATA%\LocalFx\install.log` 가 자동 생성됨 → 그 파일 받아서 디버그.
+
+### 후속 (선택)
+- 코드서명 인증서로 SmartScreen 경고 제거 (~$200/년)
+- macOS .pkg 동등 인스톨러 (Apple Developer 계정 필요)
+- GitHub Releases 자동 업로드 (gh CLI workflow)
+- 확장 안 onboarding 페이지 ("호스트 미설치 → 다운로드 링크")
+
