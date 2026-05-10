@@ -15,7 +15,7 @@
 ; doesn't compose cleanly with #define expansion. Treat the GUID as the stable
 ; identity of this product — never change it, or upgrades will install side-by-side.
 #define MyAppName      "LocalFx Native Host"
-#define MyAppVersion   "0.3.0"
+#define MyAppVersion   "0.3.1"
 #define MyAppPublisher "LocalFx"
 #define MyAppURL       "https://github.com/ssallem/local-fx"
 ; Hardcoded extension IDs (production first, dev second). Order is irrelevant
@@ -34,9 +34,12 @@ DefaultDirName={localappdata}\LocalFx
 DefaultGroupName=LocalFx
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=
+ShowLanguageDialog=no
+DisableWelcomePage=yes
+DisableFinishedPage=yes
 DisableDirPage=yes
 DisableProgramGroupPage=yes
-DisableReadyPage=no
+DisableReadyPage=yes
 OutputDir=..\..\extension\dist-prod
 OutputBaseFilename=localfx-host-setup-v{#MyAppVersion}
 Compression=lzma2/max

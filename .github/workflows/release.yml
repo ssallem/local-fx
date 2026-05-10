@@ -105,12 +105,14 @@ jobs:
           name: fx-host-windows
           path: native-host/bin
 
-      - name: Install Inno Setup 6.2.2
-        # Pinning to 6.2.2 - the version known to compose with setup.iss and
-        # matches the local dev install (C:\Users\<user>\AppData\Local\Programs\
-        # Inno Setup 6\ISCC.exe). Bumping the pin requires re-testing the
-        # AppId / DefaultDirName behavior on a clean Windows install.
-        run: choco install innosetup --version=6.2.2 -y --no-progress
+      - name: Install Inno Setup
+        # The windows-2025 runner image ships with Inno Setup 6.7.1 pre-installed,
+        # so a pinned `--version=6.2.2` install fails as a downgrade
+        # ("A newer version of InnoSetup (v6.7.1) is already installed").
+        # Drop the pin: if a 6.x is already present choco no-ops successfully;
+        # if the runner image ever changes and InnoSetup is missing, choco
+        # installs the current 6.x. setup.iss is compatible across Inno 6.x.
+        run: choco install innosetup -y --no-progress
 
       - name: Compile installer (unsigned)
         # No -Sign here. CI cannot reach the SafeNet USB token; signing happens

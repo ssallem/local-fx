@@ -361,6 +361,45 @@ Frame: [uint32 LE length][UTF-8 JSON body]  (Chrome Native Messaging 표준)
 - Phase 3 고급 기능 (선택)
 - Phase 4 배포 (MSI/pkg 서명·공증)
 
+## 미션 8 (2026-05-04 밤): WiX MSI 평행 구현 → 백아웃
+- **원본 요청 시퀀스:** "다음 작업 알려줘 / 이 PC code sign 가능 / 포함 / 둘 다 진행 / 설치 파일도 git에 올리고"
+- **리더 실수**: `git fetch` 누락. KayRemoteControl 인증서 환경만 보고 ssallem/local-fx 원격 점검 안 함. 결과: WiX 5 MSI + build-release.ps1 평행 구현(커밋 `31f670a`)을 v0.2.1로 만들었으나 원격은 Inno Setup .exe + 하이브리드 CI/operator-sign 흐름으로 v0.3.0까지 전진 (`13332ad`/`d601f1a` 등 6커밋, sjkim@spelix.com 작성).
+- **사용자 결정**: A 선택 (백아웃) — `git reset --hard origin/main`으로 31f670a 폐기. WiX 산출물 / sign.config.ps1 / Releases/v0.2.1/ 모두 정리.
+- **교훈 (영구 등록 권고)**: 서명/배포 등 운영 작업 시작 전 항상 `git fetch && git log HEAD..origin/<branch>` 먼저. 로컬 git status만으로는 협업 컨텍스트 모름.
+
+## 미션 9 (2026-05-04 밤): v0.3.0 SafeNet 서명 + GitHub Release publish
+- **원본 요청:** 미션 8 백아웃 직후 — "A로 진행해" → 원격의 sign-and-publish.ps1 흐름으로 v0.3.0 서명 + publish 마무리
+- **상황 분석:**
+  - 원격에 v0.3.0 태그(`d601f1a`)는 있으나 어떤 GitHub release도 미게시 (draft 포함 0건)
+  - CI 워크플로 4/29 16:21 UTC에 실행됐으나 1m33s만에 fail → sign-and-publish.ps1이 동작할 draft 없음
+  - sign-and-publish.ps1의 hybrid 모델은 draft 전제. CI 미동작이면 로컬 빌드+publish가 우회로
+- **선택한 경로**: 로컬 `build-setup.ps1 -Sign` → `gh release create v0.3.0 ...` 직접 publish
+
+### 실행 결과
+- **Inno Setup 6.7.1** winget 설치 (JRSoftware.InnoSetup, 비대화식)
+- **fx-host.exe v0.3.0 재빌드**: 6.35 MB (이전 세션의 v0.2.1 빌드 stale 발견 → `Get-Content version.go`로 0.3.0 확인 후 삭제+재빌드)
+- **2단계 서명 (build-setup.ps1 -Sign)**:
+  - stage 1: fx-host.exe Authenticode 서명 (DigiCert TSA, sha256/sha256, thumbprint env var `LOCALFX_SIGN_THUMBPRINT` 경유)
+  - Inno Setup 컴파일 → localfx-host-setup-v0.3.0.exe 4.01 MB
+  - stage 2: setup.exe Authenticode 서명
+  - 양쪽 모두 `signtool verify /pa /all` PASS
+- **자산 5개 staging** (CI workflow 명명 규칙 일치):
+  - `fx-host.exe` (6.35MB), `localfx-host-setup-v0.3.0.exe` (4.01MB), `localfx-host-setup-windows.exe` (stable alias, 같은 바이트, T3 onboarding 다운로드 URL), `localfx-v0.3.0.zip` (Web Store 확장, 0.09MB), `SHA256SUMS.txt` (4 entries, alias hash 동일 — 정상)
+- **GitHub Release publish**: `gh release create v0.3.0 --repo ssallem/local-fx` → https://github.com/ssallem/local-fx/releases/tag/v0.3.0 (draft=false, prerelease=false, 5 assets)
+- **stable alias 검증**: `latest/download/localfx-host-setup-windows.exe` → 302 redirect → `download/v0.3.0/localfx-host-setup-windows.exe` 정상
+
+### 관찰된 이슈 (후속 플래그)
+- **CI workflow `.github/workflows/release.yml` v0.3.0 푸시 시 fail**: 원인 미규명 (1m33s만에 종료, "Build Inno Setup installer (unsigned)" job). 향후 다음 release 전 디버깅 필요. 임시로 로컬 publish는 정상 동작하나 자동화 회복이 필요.
+- **인증서 만료 2026-07-31** — 약 3개월. 갱신 시 `$env:LOCALFX_SIGN_THUMBPRINT` 한 줄 변경.
+- **Web Store 확장 v0.3.0 zip 별도 업로드 필요** — `extension/dist-prod/localfx-v0.3.0.zip`이 이미 빌드됨. Chrome Web Store Developer Console에서 사용자 수동 업로드 필요 (자동화 불가, 약관상).
+- **버전 표기 불일치 잔재**: `installer/windows/README-DEPLOY.ko.md`가 아직 `localfx-host-setup-v0.2.1.exe`로 적혀 있음 — 다음 patch에서 v0.3.0으로 갱신 필요.
+
+### 변경된 파일 (커밋 없음)
+- `native-host/bin/fx-host.exe` (재빌드 + 서명, gitignored)
+- `extension/dist-prod/localfx-host-setup-v0.3.0.exe` (생성 + 서명, gitignored 추정)
+- `extension/dist-prod/stage/*` (수동 staging dir, gitignored 아님 — 후속 정리 필요)
+- `.claude/team-decisions.md` (이 항목)
+
 ## 미션 7 (2026-04-28): 배포 후 E_HOST_NOT_FOUND 운영 이슈
 - **원본 요청:** "탭탐색기 확장 프로그램 배포를 했는데 오류가 나고 있어..[Image #1]"
 - **증상:** Chrome Web Store v0.2.1 정상 로드, UI 정상, 하단 "드라이브 0개", DevPanel 호스트 ping → `E_HOST_NOT_FOUND: Specified native messaging host not found.`
@@ -493,6 +532,100 @@ cd D:\Dev\Chrome\local-fx\installer\windows
 - timestamp 재시도 chain: DigiCert → Sectigo → GlobalSign
 - cert selector: `LOCALFX_SIGN_THUMBPRINT` > `LOCALFX_SIGN_SUBJECT` > `/a` (auto-pick)
 - `LOCALFX_SIGN_CSP` env-var override (KSP 강제 지정 시)
+
+## 미션 10 (2026-05-10): v0.3.1 — 최소 설치 UX + 잔여 배포 정리
+
+### 배경
+- 사용자: "최종 배포까지 완료해줘. 이 pc에서 code sign 가능하니까 진행해줘. plug-in 설치시 사용자가 최소한의 설치 경험을 하도록 구성해봐."
+- v0.3.0은 이미 발행 완료(서명+publish), 미해결 잔여:
+  1. CI workflow `release.yml` v0.3.0 태그 푸시 시 1m33s 만에 failure
+  2. `installer/windows/README-DEPLOY.ko.md` 여전히 v0.2.1 표기
+  3. decisions.md 미션 8/9 변경분 미커밋
+  4. Inno Setup 마법사 다중 페이지 — 사용자가 클릭 횟수 ↓ 요청
+
+### 미션 범위 (자율 결정)
+- v0.3.1 신규 태그 (v0.3.0 덮어쓰기 X — 이미 공개됨)
+- 인스톨러 마법사: 페이지 최대한 비활성 → 더블클릭 → "설치" 한 번 → 완료
+- 잔여 3건 동시 정리
+
+### 작업 분석
+- **유형:** 인프라/배포 + UI/UX (마법사 페이지 축소)
+- **복잡도:** 보통
+- **구성 팀원:**
+  - team-explorer × 1
+  - team-architect × 1
+  - 개발자 × 3 (병렬: 인스톨러 / 문서 / CI)
+  - 빌드·서명·발행 담당 × 1
+  - team-critic × 1
+
+### 시작 시각
+2026-05-10 ~19:50 KST
+
+### Phase 2 탐색 결과 (요약)
+**마법사 페이지 현황** (`installer/windows/setup.iss:27-48`):
+- 활성: 언어선택(`ShowLanguageDialog=auto`+2언어) / 환영(미선언) / 준비(`DisableReadyPage=no`) / 완료(미선언) → **4번 클릭**
+- 비활성: `DisableDirPage=yes`, `DisableProgramGroupPage=yes`
+- `MyAppVersion` 상수: `setup.iss:18`
+
+**버전 bump 5곳:**
+1. `native-host/internal/version/version.go:16`
+2. `extension/manifest.json:6`
+3. `extension/package.json:4`
+4. `installer/windows/setup.iss:18`
+5. `native-host/internal/ops/ping_test.go:112` (테스트 픽스처 `"0.3.0"`)
+
+**CI 실패 (run 25120661318):** `package-windows` job 1m33s — ISCC 경로 탐색 실패가 최유력. `build-setup.ps1:69`의 후보 경로 (`$LOCALAPPDATA\Programs\Inno Setup 6` / `${env:ProgramFiles(x86)}\Inno Setup 6`) 가 choco 설치 경로와 어긋날 가능성.
+
+**README-DEPLOY.ko.md 잔존:** `:9` 단 1줄 (`localfx-host-setup-v0.2.1.exe`). 마법사 단계 기술도 페이지 축소 후 갱신 필요.
+
+**서명 흐름** (`build-setup.ps1:51-170`): import Signing.psm1 → fx-host.exe 서명 → ISCC 컴파일 → setup.exe 서명. `LOCALFX_SIGN_THUMBPRINT` 우선.
+
+### Phase 3 설계 결정
+
+**1. 마법사 페이지 축소 — 옵션 C 채택 (Single-Confirm Wizard)**
+- `setup.iss` line 37 앞에 3줄 추가: `ShowLanguageDialog=no` / `DisableWelcomePage=yes` / `DisableFinishedPage=yes`
+- line 39 변경: `DisableReadyPage=no` → `DisableReadyPage=yes`
+- 결과: 더블클릭 → (SmartScreen 1회 가능) → 진행률+상태레이블 → 자동 닫힘. 클릭 1~2회.
+- 언어: 영/한 둘 다 `[Languages]` 유지, `ShowLanguageDialog=no`로 시스템 로케일 자동 선택 (KR→Korean.isl, 그 외→Default.isl)
+
+**2. 버전 bump 5곳 (단순 문자열 교체)**
+- `version.go:16`, `manifest.json:6`, `package.json:4`, `setup.iss:18` — `"0.3.0"` → `"0.3.1"`
+- `ping_test.go:110-113` — 함수명 `TestPing_VersionIs0_3_0` → `TestPing_VersionIs0_3_1`, 주석/리터럴 동시 갱신 (lock-in test 패턴 — version 상수 import는 잘못)
+
+**3. CI 수정 (이중 보호)**
+- `build-setup.ps1` `$candidates` 순회 후 fallback 추가:
+  ```powershell
+  if (-not $iscc) {
+      $cmd = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+      if ($cmd) { $iscc = $cmd.Source }
+  }
+  ```
+- `release.yml` choco 핀 제거: `--version=6.2.2` 삭제
+- 진단: `${env:ProgramFiles(x86)}` PS7 해석 실패 또는 핀 버전 CDN 누락 둘 다 동일 fix로 해소
+
+**4. 릴리즈 발행: 하이브리드 모델 정상화 우선, 직접 발행 fallback 보유**
+- v0.3.1 커밋에 CI fix 포함 → 태그 푸시 → CI draft → 로컬 sign-and-publish.ps1
+- CI 또 실패 시 직접 시퀀스: 빌드 → build-setup.ps1 -Sign → gh release create v0.3.1 (no --draft)
+
+### Phase 4 완료 — 변경된 파일 8개
+
+**4-A 인스톨러+버전 (개발자 1):**
+- `installer/windows/setup.iss` — L18 버전, L37 앞 3줄 (`ShowLanguageDialog=no`/`DisableWelcomePage=yes`/`DisableFinishedPage=yes`), L42 `DisableReadyPage=yes`
+- `installer/windows/build-setup.ps1` — L76 직전 `Get-Command ISCC.exe` PATH fallback 5줄
+- `native-host/internal/version/version.go:16` — Version 0.3.1
+- `extension/manifest.json:6` — version 0.3.1
+- `extension/package.json:4` — version 0.3.1
+- `native-host/internal/ops/ping_test.go:108-112` — 함수명 `TestPing_VersionIs0_3_1` + 주석/리터럴 동기화
+
+**4-B 문서 (개발자 2):**
+- `installer/windows/README-DEPLOY.ko.md` — 파일명 v0.2.1→v0.3.1, 마법사 흐름 갱신, JCG Inc. Authenticode 서명 안내, 설치시간 30초로 단축 표기
+- `docs/NATIVE_HOST_DISTRIBUTION.md` — 헤더/예시 명령 v0.3.0→v0.3.1, "최소 클릭 마법사" 한 줄 추가. 의도된 역사 서술 ("v0.3.0부터 도입") 2건은 보존.
+
+**4-C CI (개발자 3):**
+- `.github/workflows/release.yml:108-115` — `choco install innosetup --version=6.2.2` → `choco install innosetup` (버전 핀 제거)
+- **진짜 실패 원인 확정**: windows-latest = Windows Server 2025 러너에 Inno Setup 6.7.1 **사전 설치**. choco `--version=6.2.2`가 다운그레이드 거부 → exit 1.
+- 로그 인용: `A newer version of InnoSetup (v6.7.1) is already installed. Use --allow-downgrade or --force to attempt to install older versions.`
+- ISCC 경로 fallback (4-A의 build-setup.ps1 변경)은 별개의 안전장치로 유지.
 - env-var 미설정 시 unsigned dev build 유지 (CI 안전 fallback)
 
 ### T2 — GitHub Actions CI/CD (Hybrid 모델)

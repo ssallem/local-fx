@@ -4,11 +4,11 @@ Chrome Web Store는 확장만 배포. Native Host는 별도 채널(GitHub Releas
 
 > 사용자 관점 설치 흐름은 [README.md](../README.md#설치-사용자), Web Store 측 발행은 [PUBLISHING.md](PUBLISHING.md), 업데이트 확인 프라이버시는 [PRIVACY.md](PRIVACY.md) 참조.
 
-## 배포 자산 (v0.3.0)
+## 배포 자산 (v0.3.1)
 
 GitHub Releases (`https://github.com/ssallem/local-fx/releases`)에 다음 자산이 게시됩니다:
 
-- `localfx-host-setup-v<ver>.exe` — 버전별 Inno Setup 인스톨러 (서명됨)
+- `localfx-host-setup-v<ver>.exe` — 버전별 Inno Setup 인스톨러 (서명됨, **최소 클릭 마법사** — 언어 선택·환영·완료 페이지 제거, 더블클릭 → 자동 진행 → 자동 닫힘)
 - **`localfx-host-setup-windows.exe` — stable-named alias** (확장 온보딩 패널이 다운로드하는 URL)
 - `fx-host-windows-amd64.exe` — 단일 호스트 바이너리 (수동 등록·디버깅용)
 - `SHA256SUMS.txt` — 모든 자산의 해시
@@ -32,16 +32,16 @@ GitHub Releases (`https://github.com/ssallem/local-fx/releases`)에 다음 자�
 
 ```powershell
 # 운영자 워크스테이션 — SafeNet USB 토큰 + SAC 로그인 상태
-pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.0
+pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.1
 ```
 
 스크립트가 수행하는 일:
 
-1. `gh release download v0.3.0 -p localfx-host-setup-v0.3.0.exe` — 드래프트의 미서명 인스톨러 가져오기.
+1. `gh release download v0.3.1 -p localfx-host-setup-v0.3.1.exe` — 드래프트의 미서명 인스톨러 가져오기.
 2. `installer\windows\lib\Signing.psm1`을 통해 인증서 thumbprint로 Authenticode 서명 (`signtool /tr <RFC3161 TSA> /td sha256 /fd sha256`).
 3. 서명된 자산을 동일 release에 재업로드(덮어쓰기).
 4. **stable-named alias** `localfx-host-setup-windows.exe`로 한 번 더 업로드 — 확장 온보딩 다운로드 링크가 새 버전을 가리키도록.
-5. `gh release edit v0.3.0 --draft=false` — 드래프트 해제, 공개 발행.
+5. `gh release edit v0.3.1 --draft=false` — 드래프트 해제, 공개 발행.
 
 > 이전 버전 문서에 있던 "GitHub Releases 웹 UI에서 수동 업로드" 절차는 v0.3.0 시점에 폐기되었습니다. 모든 발행은 `sign-and-publish.ps1`을 거칩니다 — 서명되지 않은 자산이 공개 release에 노출되는 것을 막기 위함.
 
@@ -60,7 +60,7 @@ pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.0
 
 확장이 첫 실행 시 호스트 미등록(`E_HOST_NOT_FOUND`) → 새 탭에 온보딩 패널이 자동 표시됩니다. 패널의 "설치 파일 다운로드" 버튼이 위의 stable alias로 이동, 사용자가 인스톨러 실행 후 "다시 시도"를 누르면 즉시 활성화됩니다. (T3)
 
-## 서명 부재 시 사용자 경험 (현재 v0.3.0)
+## 서명 부재 시 사용자 경험 (현재 v0.3.1)
 
 T1 OV 코드 서명 평판이 충분히 누적되기 전까지는:
 

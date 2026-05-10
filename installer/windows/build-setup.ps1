@@ -74,6 +74,11 @@ foreach ($c in $candidates) {
     if ($c -and (Test-Path -LiteralPath $c)) { $iscc = $c; break }
 }
 if (-not $iscc) {
+    # Fallback: choco/installer adds ISCC to PATH via shim
+    $cmd = Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { $iscc = $cmd.Source }
+}
+if (-not $iscc) {
     Write-Host "[error] ISCC.exe not found in any of:" -ForegroundColor Red
     foreach ($c in $candidates) { Write-Host "  $c" -ForegroundColor Yellow }
     Write-Host "Install Inno Setup 6 from https://jrsoftware.org/isdl.php" -ForegroundColor Yellow

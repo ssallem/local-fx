@@ -13,7 +13,7 @@ package version
 // Version is the semantic version of the native host binary. Bumped to
 // 0.3.0 alongside the extension v0.3.0 release (T2 hybrid CI + T6 opt-in
 // update check). Previous 0.0.2 was the Phase 2 read-write baseline.
-const Version = "0.3.0"
+const Version = "0.3.1"
 
 // MaxProtocolVersion is the highest IPC protocol version this host supports.
 // See docs/PROTOCOL.md §4 for handshake semantics. The ping op advertises
