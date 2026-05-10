@@ -15,10 +15,10 @@
 # stylistic.
 #
 # Usage:
-#   .\sign-and-publish.ps1 -Tag v0.3.0
-#   .\sign-and-publish.ps1 -Tag v0.3.0 -DryRun
-#   .\sign-and-publish.ps1 -Tag v0.3.0 -Thumbprint 0123456789ABCDEF...40hex
-#   .\sign-and-publish.ps1 -Tag v0.3.0 -Subject "LocalFx Inc."
+#   .\sign-and-publish.ps1 -Tag v0.3.1
+#   .\sign-and-publish.ps1 -Tag v0.3.1 -DryRun
+#   .\sign-and-publish.ps1 -Tag v0.3.1 -Thumbprint 0123456789ABCDEF...40hex
+#   .\sign-and-publish.ps1 -Tag v0.3.1 -Subject "LocalFx Inc."
 #
 # ENV CONTRACT:
 #   $env:LOCALFX_SIGN_THUMBPRINT  -> preferred cert selector (40-hex SHA-1)

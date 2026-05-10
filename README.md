@@ -1,6 +1,6 @@
 # Tab Explorer
 
-> Chrome 새 탭에서 로컬 드라이브를 탐색·조작하는 MV3 확장 — File Manager in a New Tab. Native Messaging Host로 로컬 파일에 접근. Windows 11 + macOS 지원. **v0.3.0**
+> Chrome 새 탭에서 로컬 드라이브를 탐색·조작하는 MV3 확장 — File Manager in a New Tab. Native Messaging Host로 로컬 파일에 접근. Windows 11 + macOS 지원. **v0.3.1**
 >
 > (내부 코드명: **LocalFx**. 바이너리·레지스트리·zip 파일명에서만 사용)
 
@@ -16,7 +16,7 @@
 
 1. **Chrome Web Store에서 Tab Explorer 확장 설치.**
 2. **새 탭을 엽니다.** Native Host가 없으면 온보딩 패널이 자동으로 표시되며 "설치 파일 다운로드" 버튼이 나타납니다.
-3. **`localfx-host-setup-windows.exe`를 실행.** (T1 코드 서명이 적용되기 전 v0.3.0에서는 OV 평판 빌드 단계 — SmartScreen "추가 정보 → 실행" 우회 필요. macOS는 별도 설치 스크립트.)
+3. **`localfx-host-setup-windows.exe`를 실행.** (T1 코드 서명이 적용되기 전 v0.3.1에서는 OV 평판 빌드 단계 — SmartScreen "추가 정보 → 실행" 우회 필요. macOS는 별도 설치 스크립트.)
 4. **"다시 시도" 버튼 클릭.** 호스트가 등록되면 탐색기가 즉시 활성화됩니다.
 
 > 설치 파일의 stable-named alias `localfx-host-setup-windows.exe`는 릴리즈마다 동일한 URL로 유지되므로 확장의 온보딩 다운로드 링크가 깨지지 않습니다. 자세한 내용은 [docs/NATIVE_HOST_DISTRIBUTION.md](docs/NATIVE_HOST_DISTRIBUTION.md).
@@ -76,11 +76,11 @@ npm run build
 
 ```powershell
 # 1) 태그 푸시 — GitHub Actions가 드래프트 릴리즈와 미서명 자산을 생성
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 
 # 2) 운영자 워크스테이션 (SafeNet USB + SAC 로그인 상태)
-pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.0
+pwsh installer\windows\sign-and-publish.ps1 -Tag v0.3.1
 ```
 
 전체 절차·확장 Web Store 동기화·릴리즈 노트 템플릿은 [docs/PUBLISHING.md](docs/PUBLISHING.md), Native Host 배포 세부는 [docs/NATIVE_HOST_DISTRIBUTION.md](docs/NATIVE_HOST_DISTRIBUTION.md).
