@@ -603,6 +603,39 @@ cd D:\Dev\Chrome\local-fx\installer\windows
 - `release.yml` choco 핀 제거: `--version=6.2.2` 삭제
 - 진단: `${env:ProgramFiles(x86)}` PS7 해석 실패 또는 핀 버전 CDN 누락 둘 다 동일 fix로 해소
 
+### Phase 5 — 빌드+서명+발행 결과 (2026-05-10 ~20:30 KST)
+- `fx-host.exe` — `go build -ldflags="-s -w" -trimpath` (6.34MB), Authenticode 서명, DigiCert TSA timestamp.
+- `localfx-host-setup-v0.3.1.exe` — Inno Setup 컴파일 (4.01MB), 2단계 서명 (host pre-ISCC + setup post-ISCC). SHA256: `4bd7b9ba1ce3ef2c09bf91b45ee206685bde77221e2d9dcff44eee02507b8946`
+- `localfx-v0.3.1.zip` — 92706 bytes, SHA256: `b52450f5a78a4f7cacade9a1e85c577b926c7cde6f5358bcca3875f6267e8ec2`
+- 인스톨러+호스트 모두 `signtool verify /pa /all` PASS.
+- 첫 시도에서 `fx-host.exe` PID 187128/305920가 잡고 있어 stage-1 서명 실패 → 프로세스 kill 후 성공.
+
+### Phase 6 critic 결과 + 후속 cleanup
+- CRITICAL 0 / WARNING 5 / SUGGESTION 3.
+- 실제 처리: README.md(v0.3.0→v0.3.1 banner+예시), sign-and-publish.ps1(Usage v0.3.0→v0.3.1).
+- **critic이 놓친 큰 이슈**: `extension/dist-prod/`의 stale zip(v0.2.0/v0.2.1/v0.3.0)이 git tracked → CI 'find artifacts'가 release draft에 모두 포함시킴. cleanup commit `6667c5d`에서 `.gitignore` + `git rm --cached` 4건으로 해결.
+- 미반영 WARNING: WizardForm.StatusLabel 미문서 의존성(저신뢰도 추측), PATH fallback 보안 주석(미세 개선), README-DEPLOY.ko.md SmartScreen 클릭 수 미세 부정확. 실제 운영에 영향 없음.
+
+### CI 정상화 검증
+- v0.3.1 태그 push (run id `25627394182`) → **success** 1m20s. 4 jobs all green.
+- `package-windows`/`build-extension`/`release-draft` 모두 정상.
+- 단, draft에 stale zip 4종 포함 (cleanup 전이라) → 이후 cleanup commit 후 직접 publish로 처리.
+
+### Git 상태 (최종)
+- main: `6667c5d` (cleanup) on top of `4c2d23b` (v0.3.1) on top of `d601f1a` (v0.3.0).
+- v0.3.1 태그: `4c2d23b`에 고정 (cleanup commit 6667c5d로 이동시키지 않음 — force-push 회피).
+- Release v0.3.1: `4c2d23b` 시점 자산 + cleanup 효과는 main 기준에서만 반영. 사용자에게 전달되는 release 자산은 정확.
+
+### v0.3.1 Release 발행 (2026-05-10 ~20:30 KST)
+- URL: https://github.com/ssallem/local-fx/releases/tag/v0.3.1
+- 5 자산: localfx-host-setup-v0.3.1.exe / localfx-host-setup-windows.exe (stable alias) / fx-host.exe / localfx-v0.3.1.zip / SHA256SUMS.txt
+- 모두 Authenticode 서명 (verify pass)
+- Stable alias `latest/download/localfx-host-setup-windows.exe` → HTTP 200 redirect 정상
+
+### 잔여 (사용자만 가능)
+- `extension/dist-prod/localfx-v0.3.1.zip` Chrome Web Store Developer Console 업로드
+- 인증서 만료 모니터링 (2026-07-31)
+
 **4. 릴리즈 발행: 하이브리드 모델 정상화 우선, 직접 발행 fallback 보유**
 - v0.3.1 커밋에 CI fix 포함 → 태그 푸시 → CI draft → 로컬 sign-and-publish.ps1
 - CI 또 실패 시 직접 시퀀스: 빌드 → build-setup.ps1 -Sign → gh release create v0.3.1 (no --draft)
