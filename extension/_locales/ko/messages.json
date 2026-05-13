@@ -339,6 +339,10 @@
     "message": "새로 고침",
     "description": "Context menu — re-read the current directory."
   },
+  "context_compress_zip": {
+    "message": "ZIP으로 압축",
+    "description": "Context menu — compress the selected entries into a ZIP archive."
+  },
 
   "dialog_rename_title": {
     "message": "이름",
@@ -509,6 +513,10 @@
     "message": "이동",
     "description": "Progress toast badge for move jobs."
   },
+  "toast_kind_compress": {
+    "message": "압축",
+    "description": "Progress toast badge for compress (ZIP) jobs."
+  },
   "toast_canceling": {
     "message": "취소 중…",
     "description": "Progress toast state — a cancel has been dispatched but the op hasn't terminated yet."
@@ -565,6 +573,10 @@
   "toast_result_move_title": {
     "message": "이동 결과",
     "description": "FailureSummary title when the terminated job was a move."
+  },
+  "toast_result_compress_title": {
+    "message": "압축 결과",
+    "description": "FailureSummary title when the terminated job was a compress."
   },
 
   "onboarding_title": {

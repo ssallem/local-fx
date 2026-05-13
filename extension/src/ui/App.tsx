@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type React from "react";
 import "./App.css";
 import { useExplorerStore } from "./store/explorer";
 import {
   useClipboard,
   type ClipboardMode
 } from "./store/clipboard";
-import { useJobs, startCopyJob, startMoveJob } from "./store/jobs";
+import {
+  useJobs,
+  startCompressJob,
+  startCopyJob,
+  startMoveJob
+} from "./store/jobs";
+import { useLayoutStore } from "./store/layout";
 import { Toolbar } from "./components/Toolbar";
 import { Sidebar } from "./components/Sidebar";
 import { FileList } from "./components/FileList";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { DevPanel } from "./components/DevPanel";
+import { Splitter } from "./components/Splitter";
 import {
   ContextMenu,
   type ContextMenuItem
@@ -32,6 +40,7 @@ import { basename, formatBytes, joinPath } from "./utils/format";
 import { t } from "./utils/i18n";
 import { IpcError, stat as ipcStat } from "./ipc";
 import type {
+  CompressArgs,
   CopyArgs,
   Drive,
   Entry,
@@ -168,6 +177,13 @@ export function App(): JSX.Element {
     (s) => s.resolvePendingConfirm
   );
   const cancelPendingConfirm = useExplorerStore((s) => s.cancelPendingConfirm);
+
+  // Layout store — Splitter 두 개(sidebar 폭, statusbar 높이)의 controlled state.
+  // 셀렉터를 잘게 쪼개 두면 무관한 필드 변경에 의한 리렌더가 줄어든다.
+  const sidebarWidth = useLayoutStore((s) => s.sidebarWidth);
+  const statusBarHeight = useLayoutStore((s) => s.statusBarHeight);
+  const setSidebarWidth = useLayoutStore((s) => s.setSidebarWidth);
+  const setStatusBarHeight = useLayoutStore((s) => s.setStatusBarHeight);
 
   // Clipboard mode is used both for the key-handler guard (Ctrl+V no-ops when
   // nothing to paste) and for disabling the menu items, so we subscribe.
@@ -379,6 +395,32 @@ export function App(): JSX.Element {
     }
   }, [currentPath, promptConflict]);
 
+  // Mission 16 — kick off a ZIP compress job from the current selection.
+  // Caller already guarantees a non-empty selection (the context menu is
+  // only opened against a row, which auto-selects when not part of the
+  // existing multi-selection).
+  const handleCompressZip = useCallback(() => {
+    if (currentPath === null) return;
+    if (selectedIndices.size === 0) return;
+    const paths = Array.from(selectedIndices)
+      .sort((a, b) => a - b)
+      .map((i) => entries[i])
+      .filter((e): e is Entry => !!e)
+      .map((e) => e.path);
+    if (paths.length === 0) return;
+    const destDir = currentPath;
+    const args: CompressArgs = { paths, destDir };
+    const label =
+      paths.length === 1
+        ? basename(paths[0] ?? "")
+        : t("toast_kind_compress");
+    startCompressJob(args, label, (_archivePath) => {
+      if (useExplorerStore.getState().currentPath === destDir) {
+        void useExplorerStore.getState().reload();
+      }
+    });
+  }, [currentPath, selectedIndices, entries]);
+
   // Bootstrap
   useEffect(() => {
     void loadDrives();
@@ -460,7 +502,9 @@ export function App(): JSX.Element {
           title:
             j.kind === "copy"
               ? t("toast_result_copy_title")
-              : t("toast_result_move_title"),
+              : j.kind === "move"
+                ? t("toast_result_move_title")
+                : t("toast_result_compress_title"),
           totalAttempted: Math.max(j.fileTotal, j.failures.length),
           failures: j.failures
         });
@@ -736,6 +780,11 @@ export function App(): JSX.Element {
       },
       { label: "", separator: true, onClick: () => {} },
       {
+        label: t("context_compress_zip"),
+        onClick: () => handleCompressZip()
+      },
+      { label: "", separator: true, onClick: () => {} },
+      {
         label: t("context_rename"),
         shortcut: "F2",
         onClick: () =>
@@ -794,7 +843,12 @@ export function App(): JSX.Element {
   }
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      // App.css의 grid-template-rows 마지막 row가 var(--statusbar-height, 28px) 이므로
+      // 사용자가 드래그한 높이를 CSS 변수로 흘려보내면 statusbar 행 높이가 갱신된다.
+      style={{ "--statusbar-height": `${statusBarHeight}px` } as React.CSSProperties}
+    >
       <Toolbar
         onToggleDevPanel={toggleDev}
         onCreateFolder={openCreateFolder}
@@ -806,8 +860,22 @@ export function App(): JSX.Element {
           <HomeScreen />
         </div>
       ) : (
-        <div className="main">
+        <div
+          className="main"
+          // grid-template-columns의 첫 열이 var(--sidebar-width, 240px). layout store의
+          // sidebarWidth를 매 렌더 주입해 Splitter 드래그가 즉시 grid 너비에 반영되게 한다.
+          style={{ "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}
+        >
           <Sidebar />
+          <Splitter
+            orientation="vertical"
+            value={sidebarWidth}
+            onChange={setSidebarWidth}
+            min={160}
+            max={480}
+            defaultValue={240}
+            ariaLabel="Resize drive panel"
+          />
           <FileList
             onContextMenuRow={(entry, _index, x, y) =>
               setContextMenu({ kind: "row", entry, x, y })
@@ -818,6 +886,15 @@ export function App(): JSX.Element {
           />
         </div>
       )}
+      <Splitter
+        orientation="horizontal"
+        value={statusBarHeight}
+        onChange={setStatusBarHeight}
+        min={28}
+        max={240}
+        defaultValue={28}
+        ariaLabel="Resize status bar"
+      />
       <StatusBar />
       <DevPanel open={devOpen} onClose={() => setDevOpen(false)} />
 
@@ -916,7 +993,9 @@ export function App(): JSX.Element {
                 title:
                   j.kind === "copy"
                     ? t("toast_result_copy_title")
-                    : t("toast_result_move_title"),
+                    : j.kind === "compress"
+                      ? t("toast_result_compress_title")
+                      : t("toast_result_move_title"),
                 totalAttempted: Math.max(j.fileTotal, j.failures.length),
                 failures: j.failures
               });

@@ -82,8 +82,11 @@ func TestReaddir_Happy(t *testing.T) {
 	if len(d.Entries) != 3 {
 		t.Fatalf("Entries: got %d, want 3", len(d.Entries))
 	}
-	// Default sort is name asc, case-insensitive. Expected: alpha, Bravo, charlie
-	wantNames := []string{"alpha.txt", "Bravo.md", "charlie"}
+	// Default sort is name asc, case-insensitive. Directories sort before
+	// files regardless of the chosen key (Windows Explorer convention), so
+	// charlie (a directory) leads the list.
+	// charlie is a directory and sorts before files by Windows-style convention
+	wantNames := []string{"charlie", "alpha.txt", "Bravo.md"}
 	for i, w := range wantNames {
 		if d.Entries[i].Name != w {
 			t.Errorf("Entries[%d]: got %q, want %q", i, d.Entries[i].Name, w)
@@ -134,8 +137,9 @@ func TestReaddir_SortSizeDesc(t *testing.T) {
 		t.Fatalf("OK=false: %+v", resp.Error)
 	}
 	d := parseData(t, resp)
-	// Bravo.md (200) > alpha.txt (10) > charlie (dir, 0) in desc order.
-	want := []string{"Bravo.md", "alpha.txt", "charlie"}
+	// Directories always sort first; within files, size desc orders Bravo.md
+	// (200) before alpha.txt (10). charlie (directory) leads regardless.
+	want := []string{"charlie", "Bravo.md", "alpha.txt"}
 	for i, w := range want {
 		if d.Entries[i].Name != w {
 			t.Errorf("Entries[%d]: got %q, want %q", i, d.Entries[i].Name, w)
@@ -350,5 +354,144 @@ func TestReaddir_ContextCancelled(t *testing.T) {
 	if resp.Error.Code != protocol.ErrCodeCanceled {
 		t.Errorf("code: got %q want E_CANCELED", resp.Error.Code)
 	}
+}
+
+// seedMixed populates a temp dir with the given directory and file names so
+// the dirs-first regression tests can share a tiny helper. Files are written
+// empty; size-sensitive tests should use a bespoke setup instead.
+func seedMixed(t *testing.T, dirs, files []string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, d := range dirs {
+		if err := os.Mkdir(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
+		}
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(dir, f), nil, 0o644); err != nil {
+			t.Fatalf("write %s: %v", f, err)
+		}
+	}
+	return dir
+}
+
+// assertNames is a small helper so the dirs-first tests don't repeat the same
+// index-by-index comparison block.
+func assertNames(t *testing.T, got []readdirEntry, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("entry count: got %d, want %d (got=%v)", len(got), len(want), entryNames(got))
+	}
+	for i, w := range want {
+		if got[i].Name != w {
+			t.Errorf("Entries[%d]: got %q, want %q (full=%v)", i, got[i].Name, w, entryNames(got))
+		}
+	}
+}
+
+func entryNames(es []readdirEntry) []string {
+	out := make([]string, len(es))
+	for i, e := range es {
+		out[i] = e.Name
+	}
+	return out
+}
+
+// TestReaddir_DirsFirstNameAsc verifies that with name asc the directories
+// cluster at the top in alphabetical order, then files follow in alphabetical
+// order. Mirrors the Windows Explorer / Finder default.
+func TestReaddir_DirsFirstNameAsc(t *testing.T) {
+	dir := seedMixed(t,
+		[]string{"alpha", "Bravo"},
+		[]string{"charlie.txt", "Delta.md"},
+	)
+	resp := Readdir(context.Background(), mustRequest(t, "r", readdirArgs{
+		Path: dir,
+		Sort: readdirSort{Field: "name", Order: "asc"},
+	}))
+	if !resp.OK {
+		t.Fatalf("OK=false: %+v", resp.Error)
+	}
+	d := parseData(t, resp)
+	// Case-insensitive: alpha < bravo within dirs; charlie < delta within files.
+	assertNames(t, d.Entries, []string{"alpha", "Bravo", "charlie.txt", "Delta.md"})
+}
+
+// TestReaddir_DirsFirstNameDesc verifies that desc reverses only the in-group
+// order — directories still come before files.
+func TestReaddir_DirsFirstNameDesc(t *testing.T) {
+	dir := seedMixed(t,
+		[]string{"alpha", "Bravo"},
+		[]string{"charlie.txt", "Delta.md"},
+	)
+	resp := Readdir(context.Background(), mustRequest(t, "r", readdirArgs{
+		Path: dir,
+		Sort: readdirSort{Field: "name", Order: "desc"},
+	}))
+	if !resp.OK {
+		t.Fatalf("OK=false: %+v", resp.Error)
+	}
+	d := parseData(t, resp)
+	// Dirs first (Bravo > alpha desc), then files (Delta > charlie desc).
+	assertNames(t, d.Entries, []string{"Bravo", "alpha", "Delta.md", "charlie.txt"})
+}
+
+// TestReaddir_DirsFirstSizeDesc verifies that size desc still floats
+// directories to the top even though their effective size is 0 (which would
+// normally sink them under any non-empty file).
+func TestReaddir_DirsFirstSizeDesc(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"dir_a", "dir_b"} {
+		if err := os.Mkdir(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "small.txt"), make([]byte, 10), 0o644); err != nil {
+		t.Fatalf("write small: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "large.txt"), make([]byte, 200), 0o644); err != nil {
+		t.Fatalf("write large: %v", err)
+	}
+	resp := Readdir(context.Background(), mustRequest(t, "r", readdirArgs{
+		Path: dir,
+		Sort: readdirSort{Field: "size", Order: "desc"},
+	}))
+	if !resp.OK {
+		t.Fatalf("OK=false: %+v", resp.Error)
+	}
+	d := parseData(t, resp)
+	// Dirs first (both size=0, name tiebreak reversed in desc → dir_b, dir_a),
+	// then files in size desc (large 200 > small 10).
+	assertNames(t, d.Entries, []string{"dir_b", "dir_a", "large.txt", "small.txt"})
+}
+
+// TestReaddir_AllFilesNoDirs verifies that when there are no directories the
+// secondary key is effectively the only key — nothing weird happens.
+func TestReaddir_AllFilesNoDirs(t *testing.T) {
+	dir := seedMixed(t, nil, []string{"a.txt", "b.txt", "c.txt"})
+	resp := Readdir(context.Background(), mustRequest(t, "r", readdirArgs{
+		Path: dir,
+		Sort: readdirSort{Field: "name", Order: "asc"},
+	}))
+	if !resp.OK {
+		t.Fatalf("OK=false: %+v", resp.Error)
+	}
+	d := parseData(t, resp)
+	assertNames(t, d.Entries, []string{"a.txt", "b.txt", "c.txt"})
+}
+
+// TestReaddir_AllDirsNoFiles verifies that when there are no files the
+// dirRank values are all equal so the secondary key fully drives the order.
+func TestReaddir_AllDirsNoFiles(t *testing.T) {
+	dir := seedMixed(t, []string{"z", "a", "m"}, nil)
+	resp := Readdir(context.Background(), mustRequest(t, "r", readdirArgs{
+		Path: dir,
+		Sort: readdirSort{Field: "name", Order: "asc"},
+	}))
+	if !resp.OK {
+		t.Fatalf("OK=false: %+v", resp.Error)
+	}
+	d := parseData(t, resp)
+	assertNames(t, d.Entries, []string{"a", "m", "z"})
 }
 

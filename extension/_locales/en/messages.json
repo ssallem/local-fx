@@ -339,6 +339,10 @@
     "message": "Refresh",
     "description": "Context menu — re-read the current directory."
   },
+  "context_compress_zip": {
+    "message": "Compress to ZIP",
+    "description": "Context menu — compress the selected entries into a ZIP archive."
+  },
 
   "dialog_rename_title": {
     "message": "Name",
@@ -509,6 +513,10 @@
     "message": "Move",
     "description": "Progress toast badge for move jobs."
   },
+  "toast_kind_compress": {
+    "message": "ZIP",
+    "description": "Progress toast badge for compress (ZIP) jobs."
+  },
   "toast_canceling": {
     "message": "Canceling…",
     "description": "Progress toast state — a cancel has been dispatched but the op hasn't terminated yet."
@@ -565,6 +573,10 @@
   "toast_result_move_title": {
     "message": "Move result",
     "description": "FailureSummary title when the terminated job was a move."
+  },
+  "toast_result_compress_title": {
+    "message": "Compression result",
+    "description": "FailureSummary title when the terminated job was a compress."
   },
 
   "onboarding_title": {

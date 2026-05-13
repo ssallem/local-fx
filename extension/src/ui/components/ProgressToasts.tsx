@@ -10,9 +10,20 @@
 // and `markCanceling`.
 
 import { useEffect } from "react";
-import { useJobs, type Job } from "../store/jobs";
+import { useJobs, type Job, type JobKind } from "../store/jobs";
 import { formatBytes } from "../utils/format";
 import { t } from "../utils/i18n";
+
+function kindLabel(kind: JobKind): string {
+  switch (kind) {
+    case "copy":
+      return t("toast_kind_copy");
+    case "move":
+      return t("toast_kind_move");
+    case "compress":
+      return t("toast_kind_compress");
+  }
+}
 
 const AUTO_DISMISS_MS = 3000;
 
@@ -110,8 +121,7 @@ function JobCard({ job }: { job: Job }): JSX.Element {
     <div className={`progress-toast state-${job.state}`}>
       <div className="progress-toast-header">
         <span className="progress-toast-label" title={job.label}>
-          {job.kind === "copy" ? t("toast_kind_copy") : t("toast_kind_move")}:{" "}
-          {job.label}
+          {kindLabel(job.kind)}: {job.label}
         </span>
         <span className="progress-toast-state">{stateLabel}</span>
         {isTerminal && (

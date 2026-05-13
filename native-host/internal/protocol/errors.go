@@ -100,6 +100,12 @@ const (
 	// allowlist path without `explicitConfirm: true` (see
 	// PROTOCOL.md §8 + SECURITY.md §5). retryable=false.
 	ErrCodeSystemPathConfirmRequired = "E_SYSTEM_PATH_CONFIRM_REQUIRED"
+
+	// ErrCodeArchiveFailed: zip archive creation/finalisation failed
+	// (zip.Writer.Close, underlying file.Close, or per-entry write
+	// errors that the compress op cannot recover from). retryable=false —
+	// the archive is in an indeterminate state and has been cleaned up.
+	ErrCodeArchiveFailed = "E_ARCHIVE_FAILED"
 )
 
 // NewError builds an *ErrorPayload with the given code/message/retryable flag

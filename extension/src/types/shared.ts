@@ -28,6 +28,8 @@ export type Op =
   | "cancel"
   // Phase 2.4 — streaming move (UI-resolved conflicts)
   | "move"
+  // Mission 16 — streaming compress (ZIP archive)
+  | "compress"
   // T6 — opt-in update check (default OFF; gated by extension settings)
   | "checkUpdate";
 
@@ -95,6 +97,9 @@ export type ErrorCode =
   | "E_UNKNOWN_OP"
   | "E_BAD_REQUEST"
   | "E_INTERNAL"
+  // Mission 16 — emitted by the streaming compress op when archive
+  // creation fails after the stream has already been opened.
+  | "E_ARCHIVE_FAILED"
   // --- extension-local transport codes (not in §8) ---
   | "E_TIMEOUT"
   | "E_UNKNOWN"
@@ -350,6 +355,28 @@ export interface MoveArgs {
 }
 
 // -----------------------------------------------------------------------------
+// Mission 16 — streaming compress (ZIP archive).
+//
+// Wire authority: native-host/internal/ops/compress.go.
+// Same envelope contract as copy/move: progress + done event frames with
+// ProgressPayload / DonePayload, and a terminal Response carrying
+// CompressData on success. archivePath is the absolute path of the produced
+// ZIP file, which the UI can use to reselect after a reload.
+// -----------------------------------------------------------------------------
+
+export interface CompressArgs {
+  paths: string[];
+  destDir: string;
+  archiveName?: string;
+  overwrite?: boolean;
+  explicitConfirm?: boolean;
+}
+
+export interface CompressData {
+  archivePath: string;
+}
+
+// -----------------------------------------------------------------------------
 // T6 — opt-in update check.
 //
 // Wire authority: native-host/internal/ops/update.go (CheckUpdateData).
@@ -477,6 +504,8 @@ export interface OpArgsMap {
   cancel: CancelArgs;
   // Phase 2.4 — streaming move (UI-resolved conflicts)
   move: MoveArgs;
+  // Mission 16 — streaming compress (ZIP archive)
+  compress: CompressArgs;
   // T6 — opt-in update check. Args type `undefined` (via the empty-object
   // alias) so request("checkUpdate") is callable without a second arg via
   // the OpNoArgs overload.
@@ -500,6 +529,8 @@ export interface OpDataMap {
   cancel: CancelData;
   // Phase 2.4 — same envelope/event shape as copy.
   move: EmptyData;
+  // Mission 16 — streaming compress; archive path on success.
+  compress: CompressData;
   // T6 — opt-in update check.
   checkUpdate: CheckUpdateData;
 }

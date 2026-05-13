@@ -113,4 +113,6 @@ func init() {
 	// T6 — opt-in update check (default OFF, gated extension-side; host
 	// honours LOCALFX_DISABLE_UPDATE_CHECK=1 as defence-in-depth).
 	Register("checkUpdate", CheckUpdate)
+	// Mission 16 — zip archive creation (streaming op).
+	RegisterStream("compress", Compress)
 }

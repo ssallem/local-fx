@@ -105,10 +105,9 @@ func TestPing_HostMaxProtocolVersionIs2(t *testing.T) {
 	}
 }
 
-// TestPing_VersionIs0_3_1 locks in the v0.3.1 release bump (T2 hybrid CI +
-// T6 opt-in update check). Previous 0.0.2 was the Phase 2 read-write baseline.
-func TestPing_VersionIs0_3_1(t *testing.T) {
-	if version.Version != "0.3.1" {
-		t.Errorf("Version: got %q, want %q (v0.3.1 release bump)", version.Version, "0.3.1")
+// TestPing_VersionIs0_3_2 locks in the v0.3.2 release bump (M16 compress/zip op).
+func TestPing_VersionIs0_3_2(t *testing.T) {
+	if version.Version != "0.3.2" {
+		t.Errorf("Version: got %q, want %q (v0.3.2 release bump)", version.Version, "0.3.2")
 	}
 }

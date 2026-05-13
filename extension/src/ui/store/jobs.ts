@@ -18,6 +18,8 @@
 
 import { create } from "zustand";
 import type {
+  CompressArgs,
+  CompressData,
   CopyArgs,
   DonePayload,
   FailureInfo,
@@ -26,9 +28,9 @@ import type {
   ProgressPayload,
   StreamEvent
 } from "../../types/shared";
-import { copyFile, moveFile } from "../ipc";
+import { compressFiles, copyFile, moveFile } from "../ipc";
 
-export type JobKind = "copy" | "move";
+export type JobKind = "copy" | "move" | "compress";
 export type JobState =
   | "running"
   | "canceling"
@@ -320,6 +322,75 @@ export function startMoveJob(args: MoveArgs, label: string): string {
     } else {
       s.completeJob(handle.id, false, []);
     }
+  });
+
+  return handle.id;
+}
+
+/**
+ * Mission 16 — start a streaming compress job. Behaviour mirrors
+ * startCopyJob: addJob → progress/done events drive the toast → the
+ * StreamHandle.promise is the safety net for "ok:false before done"
+ * cases. The optional onComplete callback fires with the archivePath
+ * when the Host returns a successful terminal Response, letting callers
+ * reselect the produced ZIP after a directory reload.
+ */
+export function startCompressJob(
+  args: CompressArgs,
+  label: string,
+  onComplete?: (archivePath: string) => void
+): string {
+  const handle = compressFiles(args, (evt) => {
+    const s = useJobs.getState();
+    if (evt.event === "progress" || evt.event === "item") {
+      s.updateProgress(evt.id, evt.payload, evt.event);
+    } else if (evt.event === "done") {
+      const payload = evt.payload as DonePayload;
+      s.completeJob(evt.id, payload.canceled === true, payload.failures);
+    }
+  });
+
+  useJobs.getState().addJob({
+    id: handle.id,
+    kind: "compress",
+    state: "running",
+    label,
+    bytesDone: 0,
+    bytesTotal: 0,
+    fileDone: 0,
+    fileTotal: 0,
+    failures: [],
+    startedAt: Date.now(),
+    cancel: handle.cancel
+  });
+
+  void handle.promise.then((resp) => {
+    const s = useJobs.getState();
+    const current = s.jobs[handle.id];
+    if (resp.ok) {
+      const data = resp.data as CompressData;
+      if (
+        !current ||
+        (current.state !== "done" &&
+          current.state !== "failed" &&
+          current.state !== "canceled")
+      ) {
+        s.completeJob(handle.id, false, []);
+      }
+      if (data && typeof data.archivePath === "string") {
+        onComplete?.(data.archivePath);
+      }
+      return;
+    }
+    if (
+      current &&
+      (current.state === "done" ||
+        current.state === "failed" ||
+        current.state === "canceled")
+    ) {
+      return;
+    }
+    s.failJob(handle.id, resp.error.message);
   });
 
   return handle.id;

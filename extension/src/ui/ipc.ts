@@ -1,6 +1,8 @@
 import type {
   CancelArgs,
   CheckUpdateData,
+  CompressArgs,
+  CompressData,
   CopyArgs,
   Drive,
   EmptyData,
@@ -329,6 +331,19 @@ export function moveFile(
   onEvent: StreamListener
 ): StreamHandle<EmptyData> {
   return requestStream("move", args, onEvent);
+}
+
+/**
+ * Mission 16 — streaming compress. The Host writes a ZIP under
+ * `destDir`, emitting progress/done frames identical in shape to
+ * copy/move. The terminal Response carries `archivePath` so the UI can
+ * reselect the new file after a directory reload.
+ */
+export function compressFiles(
+  args: CompressArgs,
+  onEvent: StreamListener
+): StreamHandle<CompressData> {
+  return requestStream("compress", args, onEvent);
 }
 
 // -----------------------------------------------------------------------------

@@ -726,3 +726,224 @@ cd D:\Dev\Chrome\local-fx\installer\windows
 - 코드서명 + reputation 누적 모니터링
 - 확장 v0.3.0 Web Store 재배포 (onboarding + 업데이트 토글 포함)
 
+
+---
+
+## 미션 11 — 다운로드 배포 조사 (advisory only)
+- **요청:** "localfx-host-setup-windows.exe 사용자가 어떻게 다운로드? git.io 좋아? 어디까지 구현?" (2026-05-12 22:06 KST)
+- **유형:** 조사/분석 (코드 변경 없음)
+- **팀:** team-explorer 1명
+
+### 발견 요약
+- 다운로드 URL 하드코딩 단일 진실원: `extension/src/ui/components/HostMissingOnboarding.tsx:13-14` (stable alias `releases/latest/download/localfx-host-setup-windows.exe`)
+- 진입 트리거: `extension/src/background.ts:288-297, 394-401` → E_HOST_NOT_FOUND → `ErrorBanner.tsx:41-48` → 온보딩 패널 자동 노출. 새 탭이 확장 newtab override라서 별도 탭 생성 없이 자동 표시됨
+- T6 옵트인 업데이트 알림: `native-host/internal/ops/update.go` (ETag 캐시 `%LOCALAPPDATA%\LocalFx\update-cache.json`, `LOCALFX_DISABLE_UPDATE_CHECK=1` 킬스위치, 자동 설치 코드 없음 — `window.open`만)
+- **git.io 평가:** 2022-04-29부터 GitHub가 신규 단축 차단 → 사용 불가. 현재 stable alias가 사용자 노출 없는 버튼 클릭용이라 단축 불필요.
+
+### 미완성 (배포·설치 UX 관점)
+- macOS `.pkg` + notarization (Phase 4 예정)
+- 사용자용 SHA256 검증 안내 UI/문서 부재 (운영자 체크리스트만 있음)
+
+---
+
+## 미션 12 — macOS 배포 로드맵 (advisory only)
+- **요청:** "이제 mac에 배포하려면 어떤 단계?" (2026-05-12 22:06 KST)
+- **유형:** 인프라/배포 advisory (코드 변경 없음)
+- **팀:** team-explorer 2명 병렬 + team-architect 1명 + team-critic 1명
+
+### 탐색 핵심 발견
+- Go darwin 분기 완료(CGO 미사용, osascript Trash, /Volumes 스캔). Makefile `build-mac` 존재. CI에는 macOS job 0개.
+- `installer/macos/`에는 dev용 `install.sh`+`uninstall.sh`+manifest 템플릿만. `.pkg`/codesign/notarize 스크립트 전무.
+- 확장은 macOS 감지 시 다운로드 버튼 disabled, "coming in v0.4.x" 안내(ko 메시지 채워져 있음).
+- `update.go:69` `assetPattern = "localfx-host-setup-"` Windows-only — macOS 사용자 업데이트 알림 못 받음.
+- 문서 사전 결정: `.pkg` (productbuild) 확정, Developer ID 서명 + notarization 추상 수준 확정. 인증서 종류 구분, notarytool 인증 방식, Universal vs 별도 바이너리 등 다수 미결정.
+- Apple Developer Program $99/년 + 머신·도구는 외부 의존.
+
+### Critic 지적 (반영 후 사용자 제시)
+- **CRITICAL-1**: v0.3.x 구버전 호스트가 신규 .pkg를 .exe URL로 반환할 수 있음 → 자산명을 `localfx-host-setup-macos-*.pkg`로 명확 구분 + 통합 테스트 추가
+- **CRITICAL-2**: `pkgbuild --scripts`의 postinstall 실행 비트 + two-pass 서명(component pkg는 Application 인증서, 최종 .pkg는 Installer 인증서) 명시 필요
+- **CRITICAL-3**: Stage 5(확장 UI) 가 Stage 3(릴리스 publish) 이후로 가면 Web Store 심사 기간 동안 macOS UX 깨짐 → 동시 또는 사전 완료로 재배치
+- WARNING: Windows `-Tag` vs macOS `-t` 인터페이스 비대칭 (→ `--tag`/`--dry-run` long form 통일)
+- WARNING: notarization 대기 5~60분 + 재시도 정책 일정 누락
+- WARNING: macOS runner 10x multiplier ($0.80/min) — 비용 재추정
+- WARNING: App-Specific Password 인계 리스크
+- 결론: **YES WITH CAVEATS** — CRITICAL 3건 반영하면 진행 가능
+
+### 추천 다음 액션
+1. (사용자) Apple Developer Program 가입 신청
+2. (병렬) Stage 1 (update.go assetPattern 분기 + 구버전 호환성 테스트)
+3. Stage 5(확장 UI macOS 분기)를 Stage 3 publish 전에 미리 Web Store에 올려두기
+
+---
+
+## 미션 13 — UI/UX 개선 3종 (v0.3.2 후보)
+- **요청:** (2026-05-12 23:00 KST)
+  1. 정렬: Windows 탐색기 동등 — 폴더(타입) 우선 → 이름 오름차순. 현재 Tab Explorer는 이름순만 적용해서 폴더와 파일이 섞임
+  2. 드라이브 패널 ↔ 파일 리스트 사이 vertical splitter를 드래그 가능하게 (현재 고정 폭)
+  3. 하단 상태바 splitter를 드래그 가능하게 (현재 고정 높이)
+- **유형:** UI/UX (구현 요청)
+- **팀:** team-explorer 2명 병렬 → team-architect 1명 → 개발자 → team-critic
+
+### 사용자 캡처 분석
+- 좌측 Windows 탐색기: 폴더(00.Coins, adb, CJFW_POSTYPE, dev, ...) 11개 먼저 → 파일(CJFW_POSTYPE.zip, client20260211.log, ...) 7개
+- 우측 Tab Explorer (D:\): 00.Coins, adb, CJFW_POSTYPE, CJFW_POSTYPE.zip, client*.log, dev, gg-sdk-2.5.0.zip, ... → 폴더와 파일이 알파벳 순으로 섞임
+- 하단 상태바: "18 / 18항목 · 페이지 1" — 사용자가 이 영역 높이 조절 원함
+
+### 미션 13 — 최종 결과 (2026-05-12 23:14 KST)
+- 변경 파일 6개:
+  - `native-host/internal/ops/readdir.go` — sortEntries 2단계 계층화 (dirRank 1차, 항상 asc / field 2차, desc 적용 대상)
+  - `native-host/internal/ops/readdir_test.go` — 기존 2개 wantNames 수정 + 신규 5개 테스트
+  - `extension/src/ui/store/layout.ts` (신규) — sidebarWidth(160-480, def 240), statusBarHeight(28-240, def 28), 300ms 디바운스 + beforeunload flush
+  - `extension/src/ui/components/Splitter.tsx` (신규) — controlled, pointerCapture+try/catch, ArrowKeys/Home/End ±10, 더블클릭 리셋, role=separator
+  - `extension/src/ui/App.css` — `.app`/`.main` grid CSS 변수 기반 + `.splitter` 클래스
+  - `extension/src/ui/App.tsx` — layout store 4셀렉터, CSS 변수 inline style 주입, vertical+horizontal Splitter 삽입
+- 검증:
+  - `go test ./internal/ops/...` PASS (0.777s)
+  - `npx tsc --noEmit` 0 에러
+  - `npm run build:prod` 성공 → `dist-prod/localfx-v0.3.1.zip` 93.86 KB (이전 85.67 KB 대비 +8 KB)
+- critic: CRITICAL 0건. WARNING 2건(setPointerCapture try/catch, beforeunload flush) 보강 완료.
+- **버전 bump 미실행** — manifest.json/package.json은 여전히 v0.3.1. 배포 전 사용자가 v0.3.2로 올려야 함.
+
+---
+
+## 미션 14 — Mission 13 산출물 사용자 환경 반영 (2026-05-13 22:30 KST)
+- **요청:** "정렬/Splitter가 전혀 적용 안 되어 있다" (사용자 Chrome 압축해제 로드)
+- **유형:** 버그 수정 (배포 산출물 동기화)
+- **팀:** team-explorer 1명 → 개발자 1명 → team-critic
+
+### 탐색가 진단 (2026-05-13 22:40 KST)
+- **폴더 `extension/dist-prod/localfx-v0.3.1/` 는 최신**:
+  - `assets/tab-D5ooAAzL.js`: splitter, sidebarWidth, statusBarHeight, aria-orientation 식별자 hit
+  - `assets/tab-DHQunCNA.css`: `.splitter`, `--sidebar-width`, `--statusbar-height` hit
+- **zip `extension/dist-prod/localfx-v0.3.1.zip` 는 stale** (Mission 13 미반영):
+  - 동일 식별자 0건 → Mission 13 이전 빌드의 zip
+- **Go 호스트는 최신**: `native-host/bin/fx-host.exe`, `extension/dist-prod/fx-host.exe` 모두 dirRank 관련 코드 포함
+- **해시 파일 혼재**: `SHA256SUMS.txt`(b52450f5…) vs `SHASUM256.txt`(65b7cdfc…) — 두 다른 zip을 가리킴, 정리 필요
+
+### 호스트 forbidden 사이드 이슈 (Mission 14 진행 전 처리됨)
+- `C:\Users\mellass\AppData\Local\LocalFx\com.local.fx.json`:
+  - allowed_origins에 unpacked 폴더 ID `bjaodhfconjcjjnjjhpohglpigoiblda` 추가
+  - path를 `\\\\` escape에서 forward slash로 정규화
+- 사용자 Chrome 확장 새로고침 안내됨
+
+### 완료된 작업 (Mission 14)
+1. ✅ zip 재패키징 (개발자 1): `localfx-v0.3.1.zip` → 94,108 B / SHA-256 `34d19de2…`. zip 내부 splitter 12건 / sidebarWidth 6건 / statusBarHeight 6건 hit
+2. ✅ 해시 파일 정리: SHA256SUMS.txt zip 해시 갱신, 비표준 SHASUM256.txt 삭제
+3. ✅ 호스트 바이너리 — 핵심 발견: native-host/bin/fx-host.exe, dist-prod/fx-host.exe, 사용자 PC AppData 호스트가 **모두 동일한 옛 v0.3.1 release 빌드** (mtime 2026-05-10 20:13:42, hash `86D9BCF2…`). **Mission 13 readdir.go 변경이 컴파일된 호스트에 반영 안 됨**
+4. ✅ 호스트 재빌드: `go build -o bin/fx-host.exe ./cmd/fx-host` (GOOS=windows, go1.26.2) → 9,486,848 B / hash `573589EE…` / mtime 2026-05-13 22:38:21
+5. ✅ `go test ./internal/ops/...` PASS (0.762s)
+6. ✅ 사용자 PC 호스트 교체: 실행 중 fx-host(pid 1672) kill → 새 바이너리 복사
+7. ✅ integrity.json 갱신: host_sha256 새 값 + extension_id에 unpacked ID `bjaodhfconjcjjnjjhpohglpigoiblda` 추가
+
+### 현재 사용자 PC 상태
+- `C:\Users\mellass\AppData\Local\LocalFx\fx-host.exe` — Mission 13 정렬 포함 (`573589EE…`)
+- `C:\Users\mellass\AppData\Local\LocalFx\com.local.fx.json` — allowed_origins 3개 ID 모두 포함, path forward-slash
+- `C:\Users\mellass\AppData\Local\LocalFx\integrity.json` — 새 hash + 새 ID 반영
+- Chrome 압축해제 확장 — 폴더(`dist-prod/localfx-v0.3.1/`) 최신, 사용자 reload 필요
+
+### 사용자가 즉시 할 일
+1. `chrome://extensions/` 열기
+2. "Tab Explorer" (압축해제 v0.3.1) 카드의 ↻ 새로고침 클릭
+3. 기존 새 탭 모두 닫고 다시 열기 (Ctrl+T)
+4. 확인:
+   - 정렬: 폴더가 파일보다 위에 (Windows 탐색기 동일)
+   - 좌측 드라이브 패널과 파일 리스트 사이 4px splitter — 드래그 가능
+   - 하단 상태바 위 4px horizontal splitter — 드래그 가능
+
+---
+
+## 미션 15 — Statusbar 축소 버그 + 탐색기 기능 매트릭스 (취소됨)
+- **요청:** statusbar 축소 + 기능 매트릭스
+- **상태:** 사용자가 "이미 잘 되고 있다"고 판단 — 작업 중단 및 폐기 (2026-05-13 22:55 KST)
+- **변경 파일:** 없음 (advisory 단계에서 중단)
+
+---
+
+## 미션 16 — Zip 압축 명령 추가 (2026-05-13 22:55 KST)
+- **요청:** "파일 여러개 선택해서 압축하거나 폴더 선택해서 zip으로 압축하는 명령 추가"
+- **스크린샷 단서:** 우클릭 컨텍스트 메뉴 이미 구현됨 (열기/탐색기에서 보기/복사/잘라내기/붙여넣기/이름 변경/삭제/영구 삭제)
+- **유형:** 신규 개발 (호스트 op + UI 항목)
+- **팀:** team-explorer 2(병렬) → team-architect 1 → 개발자 2(병렬: 호스트 + UI) → team-critic
+
+### 탐색 결과 핵심
+- **UI**: `App.tsx:buildRowMenu()` L705-774에 ContextMenuItem 추가, `buildBlankMenu()` L779-804은 별개. `ContextMenuItem` 인터페이스에 icon 없음. i18n `t("context_zip")` + ko/en messages.json
+- **선택 상태**: `selectedIndices: Set<number>` + entries 조합 → paths 추출 패턴 App.tsx:239-248. 우클릭 시 선택 집합에 없으면 단일 선택 자동 (FileList.tsx:295-297)
+- **에러**: `set({ error: toIpcError(e) })` → ErrorBanner 자동
+- **진행률**: `jobs store` + `ProgressToasts` (copy/move 패턴). compress도 streaming + progress 강하게 권장 (큰 폴더 timeout 위험)
+- **호스트 op 등록**: `registry.go:init()` 한 줄
+- **호스트 패턴**: args 구조체는 핸들러 파일 내부, camelCase JSON, `ExplicitConfirm` 필드, `safety.CleanPath` + `CheckMutatingOp(destDir, explicitConfirm)`
+- **에러 매핑**: `mapFSError()` 재사용. 신규 `E_ARCHIVE_FAILED`만 추가 권장
+- **재귀 워킹**: `copy.go:recursiveCopy()` + `filepath.WalkDir`. 비정규 파일은 FailureInfo skip
+- **Go stdlib `archive/zip`** 충분, 외부 의존성 없음. UTF-8 플래그 0x800 설정 필요 (Windows 한글)
+
+### 설계 결정 (확정)
+- **op**: `compress`, **streaming** 채택 (copy/move 패턴 일관, Chrome NM 60s timeout 회피, 취소 무료 획득)
+- **등록**: `RegisterStream("compress", Compress)` (registry.go init)
+- **요청**: `{ paths[], destDir, archiveName?, overwrite?(false), explicitConfirm? }`
+- **응답**: streaming progress + done events → 최종 `{ ok:true, data: { archivePath } }`
+- **archiveName auto-naming** (호스트):
+  - paths 1개 → `<이름>.zip`
+  - paths ≥2개 → `archive_YYYYMMDD_HHMMSS.zip` (호스트 로컬 시간)
+- **충돌 처리**: overwrite=false → suffix `(2)/(3)` (copy.go `UniqueName` 재사용). overwrite=true → 덮어쓰기
+- **부분 실패 정책**:
+  - setup(destDir 접근, zip 생성) 실패 → 전체 실패, 부분 생성 zip os.Remove
+  - walk per-file 실패(`EACCES`, `ERROR_SHARING_VIOLATION`) → FailureInfo 기록 후 계속
+  - zip.Close() 실패 → `E_ARCHIVE_FAILED`, 부분 파일 삭제
+- **신규 에러 코드**: `E_ARCHIVE_FAILED` (protocol/errors.go + shared.ts ErrorCode union)
+- **zip 헤더**: UTF-8 플래그 `0x800` 명시 (Windows 한글)
+- **zip 엔트리 경로**: 역슬래시 → 슬래시 정규화
+- **다중 paths 중복/parent-child**: setup에서 정렬+sub-path 제거 (copy.go `isSubPath` 활용)
+- **UI 메뉴 위치**: 잘라내기/붙여넣기 그룹 아래, 이름 변경 위 (별도 separator로 분리)
+- **라벨**: 한 "ZIP으로 압축", 영 "Compress to ZIP", i18n 키 `context_compress_zip`
+- **단축키**: 없음 (copy/move도 단축키 없음)
+- **빈 공간 메뉴**: 추가 안 함 (대상 없음)
+- **진행 표시**: jobs store + ProgressToasts (`JobKind`에 `"compress"` 추가)
+- **성공 후**: `currentPath === destDir`이면 reload + 새 zip 자동 선택 (`onComplete?: (archivePath) => void` 콜백)
+
+### 작업 분할
+- **개발자 A — 호스트 단위**: (완료, 2026-05-13 23:08 KST)
+  - native-host/internal/ops/compress.go (신규, Compress 핸들러 + dedupeSubPaths + autoArchiveName + isSoftWalkErr)
+  - native-host/internal/ops/compress_test.go (신규, 15개 케이스)
+  - native-host/internal/ops/registry.go (1줄: `RegisterStream("compress", Compress)`)
+  - native-host/internal/protocol/errors.go (E_ARCHIVE_FAILED)
+  - **검증**: `go test ./internal/ops/... -v -run TestCompress` 15/15 PASS, 전체 회귀 PASS, `go vet` 깨끗
+  - **빌드**: `native-host/bin/fx-host.exe` 9.6MB (2026-05-13 23:06)
+- **개발자 B — UI 단위 (병렬)**: (완료, 2026-05-13 23:32 KST)
+  - extension/src/types/shared.ts (Op/ErrorCode union, CompressArgs/CompressData, OpArgsMap/OpDataMap)
+  - extension/src/ui/ipc.ts (compressFiles 헬퍼)
+  - extension/src/ui/store/jobs.ts (JobKind="compress", startCompressJob(args, label, onComplete?))
+  - extension/src/ui/App.tsx (buildRowMenu 항목 + separator 2개, handleCompressZip 핸들러, FailureSummary title switch)
+  - extension/src/ui/components/ProgressToasts.tsx (**선제 리팩토**: copy/move 삼항 → kindLabel 헬퍼 switch — compress 추가 시 "이동"으로 오라벨될 버그 발견)
+  - extension/_locales/ko/messages.json (context_compress_zip, toast_kind_compress, toast_result_compress_title)
+  - extension/_locales/en/messages.json (동일)
+  - **검증**: `npx tsc --noEmit` 0 에러, `npx vite build` 72 modules PASS
+
+### 보류 사항
+- 압축 완료 후 새 zip **자동 선택** 처리는 reload만 수행, archivePath 활용 자동 선택은 v0.4.x로 미룸
+
+### critic 결과 (2026-05-13 23:10 KST)
+- **CRITICAL 2건**:
+  - C1: destDir/archivePath가 paths 하위일 때 자기 자신 압축 시도 위험
+  - C2: App.tsx L993~997 FailureSummary onClose 큐 핸들러에 compress 분기 누락 (다음 실패 모달 title이 "이동 결과"로 오라벨)
+- **WARNING 4건**:
+  - W1: 메인 walk archivePath skip 명시적 가드 없음 (C1과 동일 맥락)
+  - W2: pre-walk vs 메인 walk fileTotal 불일치 가능성 (progress 100% 미달)
+  - W3: 동일 paths 중복 입력 테스트 없음
+  - W4: void archivePath 표현 불명확
+
+### CRITICAL/WARNING 수정 (2026-05-13 23:14 KST)
+- C1 + W1 통합: compress.go에 setup 가드 2개(destDir ∈ paths 하위, archivePath ∈ paths 하위) + 메인 walk archivePath skip + `archivePathEqual` 헬퍼(Windows EqualFold)
+- C2: App.tsx L993~997 compress 분기 추가
+- W4: `(_archivePath) => {...}` rename, void 라인 제거
+- 신규 테스트 2건: `TestCompress_DestDirInsidePath_BadRequest`, `TestCompress_ArchivePathInsidePath_BadRequest` 추가
+- **검증**: 17/17 PASS, 전체 회귀 PASS, go vet 깨끗, tsc 0 에러, vite build PASS
+- W2/W3은 SUGGESTION으로 격하 (W2: UX 사소, W3: 기능엔 무관)
+
+### 사용자 PC 재배포 (2026-05-13 23:15 KST)
+- 실행 중 fx-host pid 16780 kill
+- `C:\Users\mellass\AppData\Local\LocalFx\fx-host.exe` 교체
+  - 새 크기: 9,650,176 B
+  - 새 sha256: `0a0e8b43121db0330eb018196047c505d52165c3b81d97655ba4b9332403c162`
+- `integrity.json` 갱신: host_sha256 + installed_at
+
+

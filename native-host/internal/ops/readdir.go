@@ -244,10 +244,9 @@ func isHidden(name string, info os.FileInfo) bool {
 	return false
 }
 
-// sortEntries applies args.Sort in-place. "directories first" is a common
-// file-manager convention but the protocol only specifies the enum field
-// set, not ordering semantics across type categories, so we keep the sort
-// purely on the chosen key.
+// sortEntries applies a two-level comparison: directories always sort first
+// regardless of direction, then the chosen key (field/order) is applied
+// within each category. This matches Windows Explorer / Finder conventions.
 func sortEntries(entries []readdirEntry, s readdirSort) {
 	field := s.Field
 	if field == "" {
@@ -255,8 +254,10 @@ func sortEntries(entries []readdirEntry, s readdirSort) {
 	}
 	desc := s.Order == "desc"
 
-	less := func(i, j int) bool {
-		a, b := entries[i], entries[j]
+	// fieldLess holds the original single-key comparator. We keep it as a
+	// closure so the desc swap-operand trick (swap a/b instead of negating)
+	// still preserves sort stability on tied secondary keys.
+	fieldLess := func(a, b readdirEntry) bool {
 		switch field {
 		case "size":
 			av, bv := sizeForSort(a), sizeForSort(b)
@@ -285,14 +286,33 @@ func sortEntries(entries []readdirEntry, s readdirSort) {
 			return al < bl
 		}
 	}
-	if desc {
-		// Swap operands rather than negate: negation breaks sort stability
-		// when the comparator returns false on both (i,j) and (j,i) for
-		// equal keys, producing spurious reorderings of tied entries.
-		sort.SliceStable(entries, func(i, j int) bool { return less(j, i) })
-	} else {
-		sort.SliceStable(entries, less)
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		a, b := entries[i], entries[j]
+		// Primary key: directories always before files/symlinks. This
+		// comparison is intentionally outside the desc swap so dirs stay
+		// on top even when the secondary key is descending.
+		ra, rb := dirRank(a), dirRank(b)
+		if ra != rb {
+			return ra < rb
+		}
+		// Secondary key: user-selected field. Swap operands rather than
+		// negate to keep ties stable across Go sort versions.
+		if desc {
+			return fieldLess(b, a)
+		}
+		return fieldLess(a, b)
+	})
+}
+
+// dirRank returns 0 for directories and 1 for files/symlinks so the primary
+// sort key in sortEntries clusters directories at the top regardless of the
+// secondary key's order direction.
+func dirRank(e readdirEntry) int {
+	if e.Type == "directory" {
+		return 0
 	}
+	return 1
 }
 
 // sizeForSort returns a comparable int64 for size sorting, treating nil
